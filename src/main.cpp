@@ -7,14 +7,18 @@
  */
 
 #include "config.h"
-#include <iostream>
 #include "log/Log.h"
+#include "compositor/Compositor.h"
+
+#include <iostream>
 #include <wlr/version.h>
+#include <pixman-version.h>
 using namespace std;
+using namespace vesper;
 
 static void printVersion() {
     LOG_INFO(
-        "vesper  version: ", 
+        "vesper version : ", 
         VESPER_VERSION_NAME, 
         " (", VESPER_VERSION_CODE,")"
     );
@@ -23,11 +27,22 @@ static void printVersion() {
         "wlroots version: ",
         WLR_VERSION_STR
     );
+
+    LOG_INFO(
+        "pixman version : ",
+        PIXMAN_VERSION_STRING
+    );
 }
 
 int main(int argc, const char* argv[]) {
 
     printVersion();
+
+    LOG_INFO("creating compositor")
+    
+    Compositor compositor;
+    compositor.init();
+    compositor.run();
 
 
     LOG_INFO("bye~");

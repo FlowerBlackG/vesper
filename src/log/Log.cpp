@@ -38,7 +38,7 @@ inline static void printCurrentTime() {
 
 void printInfo(const char* filename, int line) {
     printCurrentTime();
-    clog << "  ";
+    clog << " ";
     printLineInfo(filename, line);
     clog.put(' ');
 }
