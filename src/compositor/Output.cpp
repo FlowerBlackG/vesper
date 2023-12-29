@@ -14,7 +14,7 @@
 
 using namespace std;
 
-namespace vesper {
+namespace vesper::compositor {
 
 static void frameEventBridge(wl_listener* listener, void* data) {
     Output* output = wl_container_of(listener, output, eventListeners.frame);

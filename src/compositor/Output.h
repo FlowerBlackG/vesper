@@ -10,7 +10,7 @@
 
 #include "../utils/wlroots-cpp.h"
 
-namespace vesper {
+namespace vesper::compositor {
 
 class Compositor;
 class Output {
@@ -36,20 +36,7 @@ public:
         wl_listener requestState;
         wl_listener destroy;
     } eventListeners;
-/*
-    struct {
-        wl_listener map;
-        wl_listener unmap;
-        wl_listener destroy;
-        wl_listener requestMove;
-        wl_listener requestResize;
-        wl_listener requestMaximize;
-        wl_listener requestFullscreen;
 
-    } eventListeners;
-
-    wlr_scene_tree* wlrScene = nullptr;
-*/
 };
 
 

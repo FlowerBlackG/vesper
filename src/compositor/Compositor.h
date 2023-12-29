@@ -11,8 +11,10 @@
 #include "../utils/wlroots-cpp.h"
 #include "./Output.h"
 
-namespace vesper {
+namespace vesper::compositor {
     
+class View;
+
 class Compositor {
 
 public:
@@ -43,6 +45,8 @@ public:
 
     wl_list wlViews;
     wlr_xdg_shell* wlrXdgShell = nullptr;
+
+    View* grabbedView = nullptr;
 
 public:
     struct {

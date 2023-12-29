@@ -9,10 +9,11 @@
 
 #include "Compositor.h"
 #include "../log/Log.h"
+#include "./View.h"
 using namespace std;
 
 
-namespace vesper {
+namespace vesper::compositor {
 
 static void newOutputEventBridge(wl_listener* listener, void* data) {
     Compositor* compositor = wl_container_of(listener, compositor, eventListeners.newOutput);
@@ -78,7 +79,9 @@ int Compositor::init() {
     wl_list_init(&wlViews);
     wlrXdgShell = wlr_xdg_shell_create(wlDisplay, 3);
     eventListeners.newXdgSurface.notify = newXdgSurfaceEventBridge;
-    // todo
+    wl_signal_add(&wlrXdgShell->events.new_surface, &eventListeners.newXdgSurface);
+
+// todo
 
     LOG_INFO("compositor initialized.");
     return 0;
@@ -135,7 +138,37 @@ void Compositor::newOutputEventHandler(wlr_output* newOutput) {
 }
 
 void Compositor::newXdgSurfaceEventHandler(wlr_xdg_surface* newXdgSurface) {
-    // todo
+    if (newXdgSurface->role = WLR_XDG_SURFACE_ROLE_POPUP) {
+        wlr_xdg_surface* parent = wlr_xdg_surface_try_from_wlr_surface(
+            newXdgSurface->popup->parent
+        );
+
+        if (parent == nullptr) {
+            LOG_ERROR("no parent for new wlroots xdg surface!");
+            return;
+        }
+
+        auto* parentTree = (wlr_scene_tree*) parent->data;
+        newXdgSurface->data = wlr_scene_xdg_surface_create(
+            parentTree, newXdgSurface
+        );
+
+        return;
+    }
+
+    if (newXdgSurface->role != WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
+        LOG_ERROR("bad role!");
+        return;
+    }
+
+    auto* view = new (nothrow) View;
+    if (!view) {
+        LOG_ERROR("failed to alloc view!");
+        return;
+    }
+
+    view->init(this, newXdgSurface);
+
 }
 
 

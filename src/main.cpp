@@ -40,7 +40,7 @@ int main(int argc, const char* argv[]) {
 
     LOG_INFO("creating compositor")
     
-    Compositor compositor;
+    compositor::Compositor compositor;
     compositor.init();
     compositor.run();
 
