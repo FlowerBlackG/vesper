@@ -17,18 +17,21 @@ using namespace std;
 namespace vesper::compositor {
 
 static void frameEventBridge(wl_listener* listener, void* data) {
-    Output* output = wl_container_of(listener, output, eventListeners.frame);
+   
+   Output* output = wl_container_of(listener, output, eventListeners.frame);
 
     output->frameEventHandler();
 }
 
 
 static void requestStateEventBridge(wl_listener* listener, void* data) {
+
     Output* output = wl_container_of(listener, output, eventListeners.frame);
     output->requestStateEventHandler();
 }
 
 static void destroyEventBridge(wl_listener* listener, void* data) {
+    
     Output* output = wl_container_of(listener, output, eventListeners.frame);
     output->destroyEventHandler();
 }

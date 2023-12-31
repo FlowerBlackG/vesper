@@ -10,6 +10,8 @@
 #include "log/Log.h"
 #include "compositor/Compositor.h"
 
+#include "./utils/wlroots-cpp.h"
+
 #include <iostream>
 #include <wlr/version.h>
 #include <pixman-version.h>
@@ -41,7 +43,7 @@ int main(int argc, const char* argv[]) {
     LOG_INFO("creating compositor")
     
     compositor::Compositor compositor;
-    compositor.init();
+
     compositor.run();
 
 

@@ -10,6 +10,8 @@
 #include "Compositor.h"
 #include "../log/Log.h"
 #include "./View.h"
+
+#include <unistd.h>
 using namespace std;
 
 
@@ -23,7 +25,9 @@ static void newOutputEventBridge(wl_listener* listener, void* data) {
 
 static void newXdgSurfaceEventBridge(wl_listener* listener, void* data) {
 
-    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.newOutput);
+    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.newXdgSurface);
+    
+
     compositor->newXdgSurfaceEventHandler((wlr_xdg_surface*) data);
 }
 
@@ -35,7 +39,7 @@ Compositor::~Compositor() {
     this->clear();
 }
 
-int Compositor::init() {
+int Compositor::run() {
     if (initialized) {
         return 0;
     }
@@ -69,7 +73,7 @@ int Compositor::init() {
 
     wl_list_init(&wlOutputs);
 
-    eventListeners.newOutput.notify = newOutputEventBridge;
+    eventListeners.newOutput.notify = newOutputEventBridge; 
     wl_signal_add(&wlrBackend->events.new_output, &eventListeners.newOutput);
 
     wlrScene = wlr_scene_create();
@@ -81,9 +85,46 @@ int Compositor::init() {
     eventListeners.newXdgSurface.notify = newXdgSurfaceEventBridge;
     wl_signal_add(&wlrXdgShell->events.new_surface, &eventListeners.newXdgSurface);
 
-// todo
+    // wlroots cursor 
+    wlrCursor = wlr_cursor_create();
+    wlr_cursor_attach_output_layout(wlrCursor, wlrOutputLayout);
 
-    LOG_INFO("compositor initialized.");
+    // wlr xcursor manager
+    // it loads up xcursor themes to source cursor images from and 
+    // make sure that cursor images are available at all scale factors
+    // on screen.
+    wlrXCursorMgr = wlr_xcursor_manager_create(nullptr, 24);
+
+    // cursor
+    cursorMode = CursorMode::PASSTHROUGH;
+    
+    // todo: cursor motion
+    // todo: wayland seat
+
+    const char* socket = wl_display_add_socket_auto(wlDisplay);
+    if (!socket) {
+        LOG_ERROR("failed to create wayland display socket!");
+        wlr_backend_destroy(wlrBackend);
+        return -1;
+    }
+
+    if (!wlr_backend_start(wlrBackend)) {
+        wlr_backend_destroy(wlrBackend);
+        wl_display_destroy(wlDisplay);
+        LOG_ERROR("failed to start wlr backend!");
+        return -1;
+    }
+
+    LOG_INFO("running wayland display with socket: ", socket);
+
+    setenv("WAYLAND_DISPLAY", socket, true); 
+    if (fork() == 0) {
+        execl("/bin/sh", "/bin/sh", "-c", "kitty", 0);
+    }
+
+    LOG_INFO("compositor running...");
+    wl_display_run(wlDisplay);
+
     return 0;
 }
 
@@ -99,13 +140,6 @@ int Compositor::clear() {
         wl_display_destroy(wlDisplay);
         wlDisplay = nullptr;
     }
-    return 0;
-}
-
-int Compositor::run() {
-
-
-
     return 0;
 }
 
@@ -138,7 +172,7 @@ void Compositor::newOutputEventHandler(wlr_output* newOutput) {
 }
 
 void Compositor::newXdgSurfaceEventHandler(wlr_xdg_surface* newXdgSurface) {
-    if (newXdgSurface->role = WLR_XDG_SURFACE_ROLE_POPUP) {
+    if (newXdgSurface->role == WLR_XDG_SURFACE_ROLE_POPUP) {
         wlr_xdg_surface* parent = wlr_xdg_surface_try_from_wlr_surface(
             newXdgSurface->popup->parent
         );
@@ -155,6 +189,7 @@ void Compositor::newXdgSurfaceEventHandler(wlr_xdg_surface* newXdgSurface) {
 
         return;
     }
+
 
     if (newXdgSurface->role != WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
         LOG_ERROR("bad role!");

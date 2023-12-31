@@ -21,6 +21,8 @@ static void xdgToplevelMapEventBridge(wl_listener* listener, void* data) {
     
     wl_list_insert(&view->compositor->wlViews, &view->link);
 
+    LOG_INFO("new xdg toplevel mapped.");
+
     // todo: focus view
 }
 
@@ -28,6 +30,7 @@ static void xdgToplevelMapEventBridge(wl_listener* listener, void* data) {
  * called when the surface is unmapped, and should no longer be shown.
  */
 static void xdgToplevelUnmapEventBridge(wl_listener* listener, void* data) {
+
     View* view = wl_container_of(listener, view, eventListeners.unmap);
     
     if (view == view->compositor->grabbedView) {
@@ -42,7 +45,7 @@ static void xdgToplevelUnmapEventBridge(wl_listener* listener, void* data) {
 
 static void xdgToplevelDestroyEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.destroy);
-    
+
     wl_list_remove(&view->eventListeners.map.link);
     wl_list_remove(&view->eventListeners.unmap.link);
     wl_list_remove(&view->eventListeners.destroy.link);
@@ -57,25 +60,26 @@ static void xdgToplevelDestroyEventBridge(wl_listener* listener, void* data) {
 static void xdgToplevelRequestMoveEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.requestMove);
 // todo
-    view->xdgToplevelRequestMoveEventHandler();
+    //view->xdgToplevelRequestMoveEventHandler();
 }
 
 static void xdgToplevelRequestResizeEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.requestResize);
-    
-    view->xdgToplevelRequestResizeEventHandler();
+    // todo
+    //view->xdgToplevelRequestResizeEventHandler();
 }
 
 static void xdgToplevelrequestMaximizeEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.requestMaximize);
-    
-    view->xdgToplevelRequestMaximizeEventHandler();
+    // todo
+    //view->xdgToplevelRequestMaximizeEventHandler();
 }
 
 static void xdgToplevelRequestFullscreenEventBridge(wl_listener* listener, void* data) {
+
     View* view = wl_container_of(listener, view, eventListeners.requestFullscreen);
-    
-    view->xdgToplevelRequestFullscreenEventHandler();
+    // todo
+    //view->xdgToplevelRequestFullscreenEventHandler();
 }
 
 
@@ -85,9 +89,11 @@ int View::init(Compositor* compositor, wlr_xdg_surface* xdgSurface) {
 
     this->compositor = compositor;
     this->wlrXdgToplevel = xdgSurface->toplevel;
+
     wlrSceneTree = wlr_scene_xdg_surface_create(
         &this->compositor->wlrScene->tree, this->wlrXdgToplevel->base
     );
+
     wlrSceneTree->node.data = this;
     xdgSurface->data = this->wlrSceneTree;
 
@@ -111,9 +117,10 @@ int View::init(Compositor* compositor, wlr_xdg_surface* xdgSurface) {
     eventListeners.map.notify = xdgToplevelrequestMaximizeEventBridge;
     wl_signal_add(&topLevel->events.request_maximize, &eventListeners.requestMaximize);
 
-
     eventListeners.map.notify = xdgToplevelRequestFullscreenEventBridge;
     wl_signal_add(&topLevel->events.request_fullscreen, &eventListeners.requestFullscreen);
+
+    return 0;
 }
 
 }

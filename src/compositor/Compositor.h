@@ -20,7 +20,6 @@ class Compositor {
 public:
     Compositor();
     ~Compositor();
-    int init();
     int run();
     int clear();
 
@@ -29,6 +28,12 @@ public:
     void newXdgSurfaceEventHandler(wlr_xdg_surface* newXdgSurface);
 
 public:
+
+    enum class CursorMode {
+        PASSTHROUGH,
+        MOVE,
+        RESIZE
+    };
 
     bool initialized = false;
 
@@ -46,12 +51,21 @@ public:
     wl_list wlViews;
     wlr_xdg_shell* wlrXdgShell = nullptr;
 
+    wlr_cursor* wlrCursor = nullptr;
+    wlr_xcursor_manager* wlrXCursorMgr = nullptr;
+    CursorMode cursorMode = CursorMode::PASSTHROUGH;
+
     View* grabbedView = nullptr;
 
 public:
     struct {
         wl_listener newOutput;
         wl_listener newXdgSurface;
+
+        wl_listener cursorMotion;
+        wl_listener cursorButton;
+        wl_listener cursorAxis;
+        wl_listener cursorFrame;
     } eventListeners;
 
 
