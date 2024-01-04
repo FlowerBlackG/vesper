@@ -31,6 +31,88 @@ static void newXdgSurfaceEventBridge(wl_listener* listener, void* data) {
     compositor->newXdgSurfaceEventHandler((wlr_xdg_surface*) data);
 }
 
+/**
+ * 当鼠标产生“相对移动”时，本函数会被调用。
+ */
+static void cursorMotionEventBridge(wl_listener* listener, void* data) {
+    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.cursorMotion);
+
+    auto* event = (wlr_pointer_motion_event*) data;
+    wlr_cursor_move(
+        compositor->wlrCursor, 
+        &event->pointer->base,
+        event->delta_x, event->delta_y
+    );
+
+    // todo: process cursor motion
+}
+
+/**
+ * 当鼠标产生绝对位移时触发。例如，鼠标突然出现在某个角落。 
+ */
+static void cursorMotionAbsoluteEventBridge(wl_listener* listener, void* data) {
+    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.cursorMotionAbsolute);
+
+    auto* event = (wlr_pointer_motion_absolute_event*) data;
+
+    wlr_cursor_warp_absolute(
+        compositor->wlrCursor,
+        &event->pointer->base,
+        event->x, event->y
+    );
+
+    // todo: process cursor motion
+}
+
+/**
+ * 当鼠标按键被按下时触发。 
+ */
+static void cursorButtonEventBridge(wl_listener* listener, void* data) {
+    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.cursorButton);
+
+    auto* event = (wlr_pointer_button_event*) data;
+    // todo
+
+    // todo
+}
+
+/**
+ * 由坐标轴事件触发。也就是说...比如滚动鼠标滚轮的时候。 
+ */
+static void cursorAxisEventBridge(wl_listener* listener, void* data) {
+    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.cursorAxis);
+
+    // todo
+}
+
+static void cursorFrameEventBridge(wl_listener* listener, void* data) {
+    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.cursorFrame);
+
+
+    // todo
+}
+
+static void newInputEventBridge(wl_listener* listener, void* data) {
+    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.newInput);
+
+
+    // todo
+}
+
+static void requestSetCursorEventBridge(wl_listener* listener, void* data) {
+    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.requestSetCursor);
+
+
+    // todo
+}
+
+static void requestSetSelectionEventBridge(wl_listener* listener, void* data) {
+    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.requestSetSelection);
+
+
+    // todo
+}
+
 Compositor::Compositor() {
 
 }
@@ -97,9 +179,29 @@ int Compositor::run() {
 
     // cursor
     cursorMode = CursorMode::PASSTHROUGH;
-    
-    // todo: cursor motion
-    // todo: wayland seat
+    eventListeners.cursorMotion.notify = cursorMotionEventBridge;
+    wl_signal_add(&wlrCursor->events.motion, &eventListeners.cursorMotion);
+    eventListeners.cursorMotionAbsolute.notify = cursorMotionAbsoluteEventBridge;
+    wl_signal_add(&wlrCursor->events.motion_absolute, &eventListeners.cursorMotionAbsolute);
+    eventListeners.cursorButton.notify = cursorButtonEventBridge;
+    wl_signal_add(&wlrCursor->events.button, &eventListeners.cursorButton);
+    eventListeners.cursorAxis.notify = cursorAxisEventBridge;
+    wl_signal_add(&wlrCursor->events.axis, &eventListeners.cursorAxis);
+    eventListeners.cursorFrame.notify = cursorFrameEventBridge;
+    wl_signal_add(&wlrCursor->events.frame, &eventListeners.cursorFrame);
+
+    // wayland seat
+    wl_list_init(&wlKeyboards);
+    eventListeners.newInput.notify = newInputEventBridge;
+    wl_signal_add(&wlrBackend->events.new_input, &eventListeners.newInput);
+    wlrSeat = wlr_seat_create(wlDisplay, "seat0"); // todo: 真的是 seat0 么？
+    eventListeners.requestSetCursor.notify = requestSetCursorEventBridge;
+    wl_signal_add(&wlrSeat->events.request_set_cursor, &eventListeners.requestSetCursor);
+    eventListeners.requestSetSelection.notify = requestSetSelectionEventBridge;
+    wl_signal_add(&wlrSeat->events.request_set_selection, &eventListeners.requestSetSelection);
+
+
+    // socket for Wayland display.
 
     const char* socket = wl_display_add_socket_auto(wlDisplay);
     if (!socket) {

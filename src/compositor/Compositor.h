@@ -57,15 +57,23 @@ public:
 
     View* grabbedView = nullptr;
 
+    wl_list wlKeyboards;
+    wlr_seat* wlrSeat = nullptr;
+
 public:
     struct {
         wl_listener newOutput;
         wl_listener newXdgSurface;
 
         wl_listener cursorMotion;
+        wl_listener cursorMotionAbsolute;
         wl_listener cursorButton;
         wl_listener cursorAxis;
         wl_listener cursorFrame;
+
+        wl_listener newInput;
+        wl_listener requestSetCursor;
+        wl_listener requestSetSelection;
     } eventListeners;
 
 
