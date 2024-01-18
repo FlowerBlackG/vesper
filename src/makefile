@@ -4,6 +4,18 @@
 
 .DEFAULT_GOAL := all
 
+.PHONY: help
+help:
+	@echo "vesper makefile"
+	@echo "---------------"
+	@echo "commands available:"
+	@echo "- make run"
+	@echo "    build and launch vesper"
+	@echo "- make build"
+	@echo "    build vesper and copy the binary to \"target\" folder"
+	@echo "- make"
+	@echo "    alias for \"make all\""
+
 .PHONY: prepare
 prepare:
 	cd ../ && mkdir -p build && cd build \

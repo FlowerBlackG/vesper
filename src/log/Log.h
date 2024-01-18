@@ -50,10 +50,15 @@ inline void setColorError() {
 }
 }
 
+// file name 这个宏应该是可以用的，但是编辑器容易误报错。这里假装再定义一下。
+#ifndef __FILE_NAME__
+    #define __FILE_NAME__ ""
+#endif
+
 #define LOG_PLAIN(...) \
     { \
         vesper::log::printInfo( \
-            __FUNCTION__, __LINE__ \
+            __FILE_NAME__, __LINE__ \
         ); \
         vesper::log::printContent(__VA_ARGS__); \
     }
@@ -78,3 +83,11 @@ inline void setColorError() {
         LOG_PLAIN(__VA_ARGS__); \
         vesper::log::resetColor(); \
     }
+
+#if 1
+    #define LOG_TEMPORARY(...) { \
+        ConsoleColorPad::setClogColor(128, 128, 255); \
+        LOG_PLAIN(__VA_ARGS__); \
+        vesper::log::resetColor(); \
+    }
+#endif

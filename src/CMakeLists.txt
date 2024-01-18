@@ -65,11 +65,42 @@ find_package(Wlroots REQUIRED)
 find_package(XKB REQUIRED)
 find_package(LibVNCServer REQUIRED)
 
+find_package(WaylandProtocols REQUIRED)
+
+# wayland protocols
+set(XDG_PROTOCOL_DEF "${WAYLANDPROTOCOLS_PATH}/stable/xdg-shell/xdg-shell.xml")
+
+set(WAYLAND_PROTOCOLS_GEN_DIR ${CMAKE_BINARY_DIR}/wayland-protocols)
+
+make_directory(${WAYLAND_PROTOCOLS_GEN_DIR})
+
+add_custom_command(
+    OUTPUT ${WAYLAND_PROTOCOLS_GEN_DIR}/xdg-shell-client-protocol.h
+    COMMAND wayland-scanner client-header ${XDG_PROTOCOL_DEF} ${WAYLAND_PROTOCOLS_GEN_DIR}/xdg-shell-client-protocol.h
+)
+
+add_custom_command(
+    OUTPUT ${WAYLAND_PROTOCOLS_GEN_DIR}/xdg-shell-protocol.h
+    COMMAND wayland-scanner client-header ${XDG_PROTOCOL_DEF} ${WAYLAND_PROTOCOLS_GEN_DIR}/xdg-shell-protocol.h
+)
+
+add_custom_command(
+    OUTPUT ${WAYLAND_PROTOCOLS_GEN_DIR}/xdg-shell-protocol.c
+    COMMAND wayland-scanner private-code ${XDG_PROTOCOL_DEF} ${WAYLAND_PROTOCOLS_GEN_DIR}/xdg-shell-protocol.c
+    DEPENDS ${WAYLAND_PROTOCOLS_GEN_DIR}/xdg-shell-client-protocol.h
+        ${WAYLAND_PROTOCOLS_GEN_DIR}/xdg-shell-protocol.h
+)
+
+target_include_directories(${PROJECT_NAME} PRIVATE ${WAYLAND_PROTOCOLS_GEN_DIR})
+target_sources(${PROJECT_NAME} PRIVATE ${WAYLAND_PROTOCOLS_GEN_DIR}/xdg-shell-protocol.c)
+
 include_directories(
     ${WAYLAND_INCLUDE_DIR} 
     ${WLR_INCLUDE_DIRS} 
     ${XKB_INCLUDE_DIRS} 
     ${PIXMAN_INCLUDE_DIRS}
+
+    ${WAYLAND_PROTOCOLS_GEN_DIR}
 )
 
 
