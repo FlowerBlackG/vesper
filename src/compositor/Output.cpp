@@ -20,24 +20,21 @@ static void frameEventBridge(wl_listener* listener, void* data) {
    
    Output* output = wl_container_of(listener, output, eventListeners.frame);
 
-/////////////////////////////
-static uint64_t count = 0;
-LOG_TEMPORARY("frame tick: ", count++);
-////////////////////////////
     output->frameEventHandler();
 }
 
 
 static void requestStateEventBridge(wl_listener* listener, void* data) {
 
-    Output* output = wl_container_of(listener, output, eventListeners.frame);
-    output->requestStateEventHandler();
+    Output* output = wl_container_of(listener, output, eventListeners.requestState);
+    auto* event = (wlr_output_event_request_state*) data;
+    wlr_output_commit_state(output->wlrOutput, event->state);
 }
 
 static void destroyEventBridge(wl_listener* listener, void* data) {
     
-    Output* output = wl_container_of(listener, output, eventListeners.frame);
-    output->destroyEventHandler();
+    Output* output = wl_container_of(listener, output, eventListeners.destroy);
+    // todo
 }
 
 int Output::init(Compositor* compositor, wlr_output* output) {
@@ -75,20 +72,10 @@ void Output::frameEventHandler() {
 
     wlr_scene_output_commit(sceneOutput, nullptr);
 
-    wlr_renderer* renderer = compositor->wlrRenderer;
     timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
     wlr_scene_output_send_frame_done(sceneOutput, &now);
 
 }
 
-void Output::requestStateEventHandler() {
-    // todo
-}
-
-void Output::destroyEventHandler() {
-    // todo
-}
-
-
-}
+} // namespace vesper::compositor

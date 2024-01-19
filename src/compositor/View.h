@@ -9,11 +9,9 @@
 #pragma once
 
 #include "../utils/wlroots-cpp.h"
-
+#include "./Compositor.h"
 
 namespace vesper::compositor {
-
-class Compositor;
 
 class View {
 
@@ -21,6 +19,7 @@ public:
     int init(Compositor* compositor, wlr_xdg_toplevel* xdgToplevel);
 
     void focus(wlr_surface* surface);
+    void beginInteraction(Compositor::CursorMode cursorMode, uint32_t edges);
 
 public:
     wl_list link;

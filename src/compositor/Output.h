@@ -20,8 +20,6 @@ public:
     int init(Compositor* compositor, wlr_output* output);
 
     void frameEventHandler();
-    void requestStateEventHandler();
-    void destroyEventHandler();
 
 protected:
 

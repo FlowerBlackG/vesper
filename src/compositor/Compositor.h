@@ -68,6 +68,9 @@ public:
     View* grabbedView = nullptr;
     double grabX;
     double grabY;
+    wlr_box grabGeoBox;
+
+    uint32_t resizeEdges = 0;
 
     wl_list wlKeyboards;
     wlr_seat* wlrSeat = nullptr;

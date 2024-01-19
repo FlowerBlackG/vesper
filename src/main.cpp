@@ -15,8 +15,12 @@
 #include <iostream>
 #include <iomanip>
 #include <sstream>
+
+#include <unistd.h>
+
 #include <wlr/version.h>
 #include <pixman-version.h>
+
 using namespace std;
 using namespace vesper;
 

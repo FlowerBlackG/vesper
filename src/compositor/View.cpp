@@ -33,7 +33,7 @@ static void xdgToplevelMapEventBridge(wl_listener* listener, void* data) {
 static void xdgToplevelUnmapEventBridge(wl_listener* listener, void* data) {
 
     View* view = wl_container_of(listener, view, eventListeners.unmap);
-    
+    LOG_TEMPORARY("xdg unmap");
     if (view == view->compositor->grabbedView) {
         view->compositor->grabbedView = nullptr;
 
@@ -61,27 +61,54 @@ static void xdgToplevelDestroyEventBridge(wl_listener* listener, void* data) {
 
 static void xdgToplevelRequestMoveEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.requestMove);
-// todo
-    //view->xdgToplevelRequestMoveEventHandler();
+    view->beginInteraction(Compositor::CursorMode::MOVE, 0);
 }
 
+/**
+ * 当某个客户端希望 resize 时触发。
+ * 
+ * 客户端 resize 的现象：
+ *   用户将鼠标移动到客户端边框，按下鼠标左键，拖动。这时，窗口跟着用户鼠标改变大小。
+ * 
+ * 客户端 resize 的内部过程：
+ *   1. 鼠标移动到边框后，按下左键，客户端会主动发出一个 resize 请求，由本函数接收。
+ *      本函数会告知 compositor 将鼠标的状态设为“resize”。
+ *   2. 之后，鼠标继续移动，不断产生 motion 请求，由 compositor 处理。
+ *      compositor 发现鼠标处于 resize 状态，于是修改当前聚焦窗口的尺寸。
+ *   3. 鼠标左键松开后，产生 button event，由 compositor 处理。
+ *      compositor 发现 event 的内容是“按键释放”，于是取消鼠标的“resize”状态标记。
+ * 
+ * @param listener 
+ * @param data 
+ */
 static void xdgToplevelRequestResizeEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.requestResize);
-    // todo
-    //view->xdgToplevelRequestResizeEventHandler();
+    auto* event = (wlr_xdg_toplevel_resize_event*) data;
+    view->beginInteraction(Compositor::CursorMode::RESIZE, event->edges);
 }
 
 static void xdgToplevelrequestMaximizeEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.requestMaximize);
-    // todo
-    //view->xdgToplevelRequestMaximizeEventHandler();
+    
+    if (view->wlrXdgToplevel->base->initialized) {
+        
+        int targetHeight = 720; // todo
+        int targetWidth = 1280; // todo
+
+        wlr_scene_node_set_position(&view->wlrSceneTree->node, 0, 0);
+        wlr_xdg_toplevel_set_size(view->wlrXdgToplevel, targetWidth, targetHeight);
+
+        // todo
+    }
 }
 
 static void xdgToplevelRequestFullscreenEventBridge(wl_listener* listener, void* data) {
 
     View* view = wl_container_of(listener, view, eventListeners.requestFullscreen);
-    // todo
-    //view->xdgToplevelRequestFullscreenEventHandler();
+    
+    if (view->wlrXdgToplevel->base->initialized) {
+        // todo
+    }
 }
 
 
@@ -98,7 +125,6 @@ int View::init(Compositor* compositor, wlr_xdg_toplevel* xdgToplevel) {
 
     wlrSceneTree->node.data = this;
     xdgToplevel->base->data = this->wlrSceneTree;
-LOG_TEMPORARY("view init")
 
     auto* xdgSurface = xdgToplevel->base;
 
@@ -146,8 +172,6 @@ void View::focus(wlr_surface* surface) {
     auto* keyboard = wlr_seat_get_keyboard(seat);
 
     wlr_scene_node_raise_to_top(&wlrSceneTree->node);
-    wl_list_remove(&link);
-    wl_list_insert(&compositor->views, &link);
 
     wlr_xdg_toplevel_set_activated(this->wlrXdgToplevel, true);
 
@@ -158,6 +182,41 @@ void View::focus(wlr_surface* surface) {
         );
     }
 
+}
+
+void View::beginInteraction(Compositor::CursorMode cursorMode, uint32_t edges) {
+    auto* focusedSurface = compositor->wlrSeat->pointer_state.focused_surface;
+    if (wlrXdgToplevel->base->surface != wlr_surface_get_root_surface(focusedSurface)) {
+        return;
+    }
+
+    compositor->grabbedView = this;
+    compositor->cursorMode = cursorMode;
+
+    if (cursorMode == Compositor::CursorMode::MOVE) {
+        compositor->grabX = compositor->wlrCursor->x - wlrSceneTree->node.x;
+        compositor->grabY = compositor->wlrCursor->y - wlrSceneTree->node.y;
+    } else { // resize
+        LOG_TEMPORARY("view resize")
+        wlr_box geoBox;
+        wlr_xdg_surface_get_geometry(wlrXdgToplevel->base, &geoBox);
+
+        double borderX = wlrSceneTree->node.x + geoBox.x;
+        borderX += ((edges & WLR_EDGE_RIGHT) ? geoBox.width : 0);
+
+        double borderY = wlrSceneTree->node.y + geoBox.y;
+        borderY += ((edges & WLR_EDGE_BOTTOM) ? geoBox.height : 0);
+
+        compositor->grabX = compositor->wlrCursor->x - borderX;
+        compositor->grabY = compositor->wlrCursor->y - borderY;
+
+        compositor->grabGeoBox = geoBox;
+        compositor->grabGeoBox.x += wlrSceneTree->node.x;
+        compositor->grabGeoBox.y += wlrSceneTree->node.y;
+
+        compositor->resizeEdges = edges;
+    }
+    
 }
 
 }

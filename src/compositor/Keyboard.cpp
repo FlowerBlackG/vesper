@@ -14,8 +14,22 @@ using namespace std;
 
 namespace vesper::compositor {
 
+/**
+ * 当 alt ctrl 之类的按键被按下时触发。
+ * 
+ * @param listener 
+ * @param data 
+ */
 static void modifiersEventBridge(wl_listener* listener, void* data) {
-    // todo
+
+    Keyboard* keyboard = wl_container_of(listener, keyboard, eventListeners.modifiers);
+
+    auto* compositor = keyboard->compositor;
+
+    wlr_seat_set_keyboard(compositor->wlrSeat, keyboard->wlrKeyboard);
+
+    // 向客户端发送信息。
+    wlr_seat_keyboard_notify_modifiers(compositor->wlrSeat, &keyboard->wlrKeyboard->modifiers);
 }
 
 static void keyEventBridge(wl_listener* listener, void* data) {

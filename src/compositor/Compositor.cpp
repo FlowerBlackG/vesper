@@ -35,7 +35,6 @@ static void newXdgToplevelEventBridge(wl_listener* listener, void* data) {
     if (!view) {
         LOG_ERROR("failed to allocate View object!");
         return;
-        // todo
     }
 
     view->init(compositor, toplevel);    
@@ -52,7 +51,6 @@ static void newXdgPopupEventBridge(wl_listener* listener, void* data) {
     if (!parent) {
         LOG_ERROR("no parent for popup!");
         return;
-        // todo
     }
 
     auto* parentTree = (wlr_scene_tree*) parent->data;
@@ -173,16 +171,34 @@ static void newInputEventBridge(wl_listener* listener, void* data) {
     wlr_seat_set_capabilities(compositor->wlrSeat, capability);
 }
 
+/**
+ * 当客户端希望设置鼠标样式时触发。
+ * 
+ * @param listener 
+ * @param data 
+ */
 static void requestSetCursorEventBridge(wl_listener* listener, void* data) {
     Compositor* compositor = wl_container_of(listener, compositor, eventListeners.requestSetCursor);
 
+    auto* event = (wlr_seat_pointer_request_set_cursor_event*) data;
+    auto* focusedClient = compositor->wlrSeat->pointer_state.focused_client;
 
-    // todo
+    if (focusedClient == event->seat_client) {
+        wlr_cursor_set_surface(
+            compositor->wlrCursor, event->surface,
+            event->hotspot_x, event->hotspot_y
+        );
+    }
 }
 
+/**
+ * 当用户产生“拷贝”时触发。
+ * 
+ * @param listener 
+ * @param data 
+ */
 static void requestSetSelectionEventBridge(wl_listener* listener, void* data) {
     Compositor* compositor = wl_container_of(listener, compositor, eventListeners.requestSetSelection);
-
 
     // todo
 }
@@ -341,7 +357,6 @@ void Compositor::newOutputEventHandler(wlr_output* newOutput) {
     if (!output) {
         LOG_ERROR("failed to create output!");
         return;
-        // todo
     }
 
     output->init(this, newOutput);
@@ -355,6 +370,7 @@ void Compositor::processCursorMotion(uint32_t timeMsec) {
         processCursorMove(timeMsec);
         return;
     } else if (cursorMode == CursorMode::RESIZE) {
+        LOG_TEMPORARY("cursor resize");
         processCursorResize(timeMsec);
         return;
     }
@@ -389,7 +405,52 @@ void Compositor::processCursorMove(uint32_t timeMsec) {
 }
 
 void Compositor::processCursorResize(uint32_t timeMsec) {
-// todo
+    View* view = grabbedView;
+    double borderX = wlrCursor->x - grabX;
+    double borderY = wlrCursor->y - grabY;
+    int newLeft = grabGeoBox.x;
+    int newRight = grabGeoBox.x + grabGeoBox.width;
+    int newTop = grabGeoBox.y;
+    int newBottom = grabGeoBox.y + grabGeoBox.height;
+
+    if (resizeEdges & WLR_EDGE_TOP) {
+        newTop = borderY;
+        if (newTop >= newBottom) {
+            newTop = newBottom - 1;
+        }
+    } else if (resizeEdges & WLR_EDGE_BOTTOM) {
+        newBottom = borderY;
+        if (newBottom <= newTop) {
+            newBottom = newTop + 1;
+        }
+    }
+
+    if (resizeEdges & WLR_EDGE_LEFT) {
+        newLeft = borderX;
+        if (newLeft >= newRight) {
+            newLeft = newRight - 1;
+        }
+    } else if (resizeEdges & WLR_EDGE_RIGHT) {
+        newRight = borderX;
+        if (newRight <= newLeft) {
+            newRight = newLeft + 1;
+        }
+    }
+
+    wlr_box geoBox;
+    wlr_xdg_surface_get_geometry(view->wlrXdgToplevel->base, &geoBox);
+    wlr_scene_node_set_position(
+        &view->wlrSceneTree->node,
+        newLeft - geoBox.x,
+        newTop - geoBox.y 
+    );
+
+    int newWidth = newRight - newLeft;
+    int newHeight = newBottom - newTop;
+
+    wlr_xdg_toplevel_set_size(
+        view->wlrXdgToplevel, newWidth, newHeight
+    );
 }
 
 View* Compositor::desktopViewAt(
