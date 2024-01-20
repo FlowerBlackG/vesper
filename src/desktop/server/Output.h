@@ -8,16 +8,22 @@
 
 #pragma once
 
-#include "../utils/wlroots-cpp.h"
+#include "../../utils/wlroots-cpp.h"
 
-namespace vesper::compositor {
+namespace vesper::desktop::server {
 
-class Compositor;
+class Server;
+
+/**
+ * 输出界面。
+ * 每一个“屏幕”都是一个 Output。
+ * 所谓“屏幕”，可能是 Linux DRM，可能是一个窗口，也可能是虚拟屏幕（离屏渲染）。
+ */
 class Output {
 
 public:
 
-    int init(Compositor* compositor, wlr_output* output);
+    int init(Server* server, wlr_output* output);
 
     void frameEventHandler();
 
@@ -26,7 +32,7 @@ protected:
 
 public:
     wl_list link;
-    Compositor* compositor;
+    Server* server;
     wlr_output* wlrOutput;
 
     struct {

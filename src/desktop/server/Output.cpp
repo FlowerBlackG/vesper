@@ -8,13 +8,13 @@
 
 
 #include "./Output.h"
-#include "../log/Log.h"
+#include "../../log/Log.h"
 
-#include "./Compositor.h"
+#include "./Server.h"
 
 using namespace std;
 
-namespace vesper::compositor {
+namespace vesper::desktop::server {
 
 static void frameEventBridge(wl_listener* listener, void* data) {
    
@@ -34,12 +34,22 @@ static void requestStateEventBridge(wl_listener* listener, void* data) {
 static void destroyEventBridge(wl_listener* listener, void* data) {
     
     Output* output = wl_container_of(listener, output, eventListeners.destroy);
-    // todo
+    
+    wl_list_remove(&output->eventListeners.destroy.link);
+    wl_list_remove(&output->eventListeners.requestState.link);
+    wl_list_remove(&output->eventListeners.frame.link);
+    wl_list_remove(&output->link);
+
+    auto* server = output->server; // todo: 目前仅支持一个输出目标。
+
+    delete output;
+
+    wl_display_terminate(server->wlDisplay);
 }
 
-int Output::init(Compositor* compositor, wlr_output* output) {
+int Output::init(Server* server, wlr_output* output) {
 
-    this->compositor = compositor;
+    this->server = server;
     this->wlrOutput = output;
 
     eventListeners.frame.notify = frameEventBridge;
@@ -51,22 +61,22 @@ int Output::init(Compositor* compositor, wlr_output* output) {
     eventListeners.destroy.notify = destroyEventBridge;
     wl_signal_add(&wlrOutput->events.destroy, &eventListeners.destroy);
 
-    wl_list_insert(&compositor->wlOutputs, &link);
+    wl_list_insert(&server->wlOutputs, &link);
 
     wlr_output_layout_output* layoutOutput = wlr_output_layout_add_auto(
-        compositor->wlrOutputLayout, wlrOutput
+        server->wlrOutputLayout, wlrOutput
     );
-    wlr_scene_output* sceneOutput = wlr_scene_output_create(compositor->wlrScene, wlrOutput);
-    wlr_scene_output_layout_add_output(compositor->wlrSceneLayout, layoutOutput, sceneOutput);
+    wlr_scene_output* sceneOutput = wlr_scene_output_create(server->wlrScene, wlrOutput);
+    wlr_scene_output_layout_add_output(server->wlrSceneLayout, layoutOutput, sceneOutput);
 
-    LOG_INFO("compositor new output added.")
+    LOG_INFO("server new output added.")
 
     return 0;
 }
 
 
 void Output::frameEventHandler() {
-    wlr_scene* scene = compositor->wlrScene;
+    wlr_scene* scene = server->wlrScene;
 
     wlr_scene_output* sceneOutput = wlr_scene_get_scene_output(scene, wlrOutput);
 
@@ -78,4 +88,4 @@ void Output::frameEventHandler() {
 
 }
 
-} // namespace vesper::compositor
+} // namespace vesper::desktop::server

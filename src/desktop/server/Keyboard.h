@@ -8,21 +8,21 @@
 
 #pragma once
 
-#include "../utils/wlroots-cpp.h"
+#include "../../utils/wlroots-cpp.h"
 
-namespace vesper::compositor {
+namespace vesper::desktop::server {
 
-class Compositor;
+class Server;
 
 class Keyboard {
 
 public:
-    int init(Compositor* compositor, wlr_keyboard* wlrKeyboard, wlr_input_device* device);
+    int init(Server* server, wlr_keyboard* wlrKeyboard, wlr_input_device* device);
 
 
 public:
     wl_list link;
-    Compositor* compositor;
+    Server* server;
     wlr_keyboard* wlrKeyboard;
 
     struct {

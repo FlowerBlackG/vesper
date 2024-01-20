@@ -6,6 +6,10 @@
 
 该项目为作者毕业设计项目的一部分。
 
+## 整体结构
+
+![img](./doc/images/vesper-overview.drawio.svg)
+
 ## 参考
 
 [weston](https://gitlab.freedesktop.org/wayland/weston)

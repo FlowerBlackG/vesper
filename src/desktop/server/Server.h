@@ -1,25 +1,31 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 
 /*
- * Wayland 合成器
+ * Wayland Server
  * 
  * 创建于 2023年12月26日 上海市嘉定区安亭镇
  */
 
 #pragma once
 
-#include "../utils/wlroots-cpp.h"
+#include "../../utils/wlroots-cpp.h"
 #include "./Output.h"
 
-namespace vesper::compositor {
+namespace vesper::desktop::server {
     
 class View;
 
-class Compositor {
+/**
+ * Wayland Server
+ * 
+ * 该模块是一个基于 wlroots 的 Wayland 图形服务器。负责完成创建 Wayland 服务器、
+ * 接收和转交键鼠请求等任务。
+ */
+class Server {
 
 public:
-    Compositor();
-    ~Compositor();
+    Server();
+    ~Server();
     int run();
     int clear();
 

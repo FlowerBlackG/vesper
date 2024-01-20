@@ -7,11 +7,11 @@
  */
 
 #include "./View.h"
-#include "../log/Log.h"
-#include "./Compositor.h"
+#include "../../log/Log.h"
+#include "./Server.h"
 using namespace std;
 
-namespace vesper::compositor {
+namespace vesper::desktop::server {
 
 /**
  * called when the surface is mapped, or ready to display on-screen. 
@@ -19,10 +19,9 @@ namespace vesper::compositor {
 static void xdgToplevelMapEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.map);
     
-    wl_list_insert(&view->compositor->views, &view->link);
+    wl_list_insert(&view->server->views, &view->link);
 
     LOG_INFO("new xdg toplevel mapped.");
-    LOG_TEMPORARY("new xdg toplevel mapped.");
 
     view->focus(view->wlrXdgToplevel->base->surface);
 }
@@ -34,11 +33,11 @@ static void xdgToplevelUnmapEventBridge(wl_listener* listener, void* data) {
 
     View* view = wl_container_of(listener, view, eventListeners.unmap);
     LOG_TEMPORARY("xdg unmap");
-    if (view == view->compositor->grabbedView) {
-        view->compositor->grabbedView = nullptr;
+    if (view == view->server->grabbedView) {
+        view->server->grabbedView = nullptr;
 
-        view->compositor->cursorMode = Compositor::CursorMode::PASSTHROUGH;
-        view->compositor->grabbedView = nullptr;
+        view->server->cursorMode = Server::CursorMode::PASSTHROUGH;
+        view->server->grabbedView = nullptr;
 
     }
 
@@ -61,7 +60,7 @@ static void xdgToplevelDestroyEventBridge(wl_listener* listener, void* data) {
 
 static void xdgToplevelRequestMoveEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.requestMove);
-    view->beginInteraction(Compositor::CursorMode::MOVE, 0);
+    view->beginInteraction(Server::CursorMode::MOVE, 0);
 }
 
 /**
@@ -72,11 +71,11 @@ static void xdgToplevelRequestMoveEventBridge(wl_listener* listener, void* data)
  * 
  * 客户端 resize 的内部过程：
  *   1. 鼠标移动到边框后，按下左键，客户端会主动发出一个 resize 请求，由本函数接收。
- *      本函数会告知 compositor 将鼠标的状态设为“resize”。
- *   2. 之后，鼠标继续移动，不断产生 motion 请求，由 compositor 处理。
- *      compositor 发现鼠标处于 resize 状态，于是修改当前聚焦窗口的尺寸。
- *   3. 鼠标左键松开后，产生 button event，由 compositor 处理。
- *      compositor 发现 event 的内容是“按键释放”，于是取消鼠标的“resize”状态标记。
+ *      本函数会告知 server 将鼠标的状态设为“resize”。
+ *   2. 之后，鼠标继续移动，不断产生 motion 请求，由 server 处理。
+ *      server 发现鼠标处于 resize 状态，于是修改当前聚焦窗口的尺寸。
+ *   3. 鼠标左键松开后，产生 button event，由 server 处理。
+ *      server 发现 event 的内容是“按键释放”，于是取消鼠标的“resize”状态标记。
  * 
  * @param listener 
  * @param data 
@@ -84,7 +83,7 @@ static void xdgToplevelRequestMoveEventBridge(wl_listener* listener, void* data)
 static void xdgToplevelRequestResizeEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.requestResize);
     auto* event = (wlr_xdg_toplevel_resize_event*) data;
-    view->beginInteraction(Compositor::CursorMode::RESIZE, event->edges);
+    view->beginInteraction(Server::CursorMode::RESIZE, event->edges);
 }
 
 static void xdgToplevelrequestMaximizeEventBridge(wl_listener* listener, void* data) {
@@ -92,8 +91,13 @@ static void xdgToplevelrequestMaximizeEventBridge(wl_listener* listener, void* d
     
     if (view->wlrXdgToplevel->base->initialized) {
         
-        int targetHeight = 720; // todo
-        int targetWidth = 1280; // todo
+        // todo: 假设仅有 1 个 output
+
+        auto outputNode = view->server->wlOutputs.next;
+        Output* output = wl_container_of(outputNode, output, link);
+
+        int targetHeight = output->wlrOutput->height;
+        int targetWidth = output->wlrOutput->width;
 
         wlr_scene_node_set_position(&view->wlrSceneTree->node, 0, 0);
         wlr_xdg_toplevel_set_size(view->wlrXdgToplevel, targetWidth, targetHeight);
@@ -114,13 +118,13 @@ static void xdgToplevelRequestFullscreenEventBridge(wl_listener* listener, void*
 
 
 
-int View::init(Compositor* compositor, wlr_xdg_toplevel* xdgToplevel) {
+int View::init(Server* server, wlr_xdg_toplevel* xdgToplevel) {
 
-    this->compositor = compositor;
+    this->server = server;
     this->wlrXdgToplevel = xdgToplevel;
 
     wlrSceneTree = wlr_scene_xdg_surface_create(
-        &this->compositor->wlrScene->tree, xdgToplevel->base
+        &this->server->wlrScene->tree, xdgToplevel->base
     );
 
     wlrSceneTree->node.data = this;
@@ -155,7 +159,7 @@ int View::init(Compositor* compositor, wlr_xdg_toplevel* xdgToplevel) {
 }
 
 void View::focus(wlr_surface* surface) {
-    auto* seat = this->compositor->wlrSeat;
+    auto* seat = this->server->wlrSeat;
     auto* prevSurface = seat->keyboard_state.focused_surface;
     if (prevSurface == surface) {
         return;
@@ -184,20 +188,20 @@ void View::focus(wlr_surface* surface) {
 
 }
 
-void View::beginInteraction(Compositor::CursorMode cursorMode, uint32_t edges) {
-    auto* focusedSurface = compositor->wlrSeat->pointer_state.focused_surface;
+void View::beginInteraction(Server::CursorMode cursorMode, uint32_t edges) {
+    auto* focusedSurface = server->wlrSeat->pointer_state.focused_surface;
     if (wlrXdgToplevel->base->surface != wlr_surface_get_root_surface(focusedSurface)) {
         return;
     }
 
-    compositor->grabbedView = this;
-    compositor->cursorMode = cursorMode;
+    server->grabbedView = this;
+    server->cursorMode = cursorMode;
 
-    if (cursorMode == Compositor::CursorMode::MOVE) {
-        compositor->grabX = compositor->wlrCursor->x - wlrSceneTree->node.x;
-        compositor->grabY = compositor->wlrCursor->y - wlrSceneTree->node.y;
+    if (cursorMode == Server::CursorMode::MOVE) {
+        server->grabX = server->wlrCursor->x - wlrSceneTree->node.x;
+        server->grabY = server->wlrCursor->y - wlrSceneTree->node.y;
     } else { // resize
-        LOG_TEMPORARY("view resize")
+        
         wlr_box geoBox;
         wlr_xdg_surface_get_geometry(wlrXdgToplevel->base, &geoBox);
 
@@ -207,14 +211,14 @@ void View::beginInteraction(Compositor::CursorMode cursorMode, uint32_t edges) {
         double borderY = wlrSceneTree->node.y + geoBox.y;
         borderY += ((edges & WLR_EDGE_BOTTOM) ? geoBox.height : 0);
 
-        compositor->grabX = compositor->wlrCursor->x - borderX;
-        compositor->grabY = compositor->wlrCursor->y - borderY;
+        server->grabX = server->wlrCursor->x - borderX;
+        server->grabY = server->wlrCursor->y - borderY;
 
-        compositor->grabGeoBox = geoBox;
-        compositor->grabGeoBox.x += wlrSceneTree->node.x;
-        compositor->grabGeoBox.y += wlrSceneTree->node.y;
+        server->grabGeoBox = geoBox;
+        server->grabGeoBox.x += wlrSceneTree->node.x;
+        server->grabGeoBox.y += wlrSceneTree->node.y;
 
-        compositor->resizeEdges = edges;
+        server->resizeEdges = edges;
     }
     
 }

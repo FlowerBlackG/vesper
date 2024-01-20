@@ -8,7 +8,7 @@
 
 #include "config.h"
 #include "log/Log.h"
-#include "compositor/Compositor.h"
+#include "desktop/server/Server.h"
 
 #include "./utils/wlroots-cpp.h"
 
@@ -46,10 +46,10 @@ int main(int argc, const char* argv[]) {
 
     printVersion();
 
-    LOG_INFO("creating compositor")
+    LOG_INFO("creating desktop server")
     
-    compositor::Compositor compositor;
-    compositor.run();
+    desktop::server::Server server;
+    server.run();
 
     LOG_INFO("bye~");
     return 0;

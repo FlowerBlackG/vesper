@@ -1,53 +1,67 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 
 /*
- * Wayland 合成器
+ * Wayland Server
  * 
  * 创建于 2023年12月26日 上海市嘉定区安亭镇
  */
 
 
-#include "Compositor.h"
+#include "./Server.h"
 #include "./Keyboard.h"
 
-#include "../log/Log.h"
+#include "../../log/Log.h"
 #include "./View.h"
 
 #include <unistd.h>
 using namespace std;
 
 
-namespace vesper::compositor {
+namespace vesper::desktop::server {
 
 static void newOutputEventBridge(wl_listener* listener, void* data) {
-    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.newOutput);
+    Server* server = wl_container_of(listener, server, eventListeners.newOutput);
 
-    compositor->newOutputEventHandler((wlr_output*) data);
+    server->newOutputEventHandler((wlr_output*) data);
 }
 
+/**
+ * 创建新窗口时触发。
+ * 
+ * @param listener 
+ * @param data 
+ */
 static void newXdgToplevelEventBridge(wl_listener* listener, void* data) {
 
-    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.newXdgToplevel);
+    Server* server = wl_container_of(listener, server, eventListeners.newXdgToplevel);
 
     auto* toplevel = (wlr_xdg_toplevel*) data;
-
+LOG_TEMPORARY("toplevel: ", toplevel->base);
     View* view = new (nothrow) View;
     if (!view) {
         LOG_ERROR("failed to allocate View object!");
         return;
     }
 
-    view->init(compositor, toplevel);    
+    view->init(server, toplevel);    
 
 }
 
+/**
+ * 创建新“气泡”时触发。
+ * 气泡例：打开的一个浮动菜单。
+ * 
+ * @param listener 
+ * @param data 
+ */
 static void newXdgPopupEventBridge(wl_listener* listener, void* data) {
-    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.newXdgPopup);
+
+    Server* server = wl_container_of(listener, server, eventListeners.newXdgPopup);
 
     auto* xdgPopup = (wlr_xdg_popup*) data;
 
-    auto* parent = wlr_xdg_surface_try_from_wlr_surface(xdgPopup->parent);
-
+    wlr_xdg_surface* parent = wlr_xdg_surface_try_from_wlr_surface(xdgPopup->parent);
+LOG_TEMPORARY("popup: ", xdgPopup->base, " <- ", parent);
     if (!parent) {
         LOG_ERROR("no parent for popup!");
         return;
@@ -61,57 +75,57 @@ static void newXdgPopupEventBridge(wl_listener* listener, void* data) {
  * 当鼠标产生“相对移动”时，本函数会被调用。
  */
 static void cursorMotionEventBridge(wl_listener* listener, void* data) {
-    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.cursorMotion);
+    Server* server = wl_container_of(listener, server, eventListeners.cursorMotion);
 
     auto* event = (wlr_pointer_motion_event*) data;
     wlr_cursor_move(
-        compositor->wlrCursor, 
+        server->wlrCursor, 
         &event->pointer->base,
         event->delta_x, event->delta_y
     );
 
-    compositor->processCursorMotion(event->time_msec);
+    server->processCursorMotion(event->time_msec);
 }
 
 /**
  * 当鼠标产生绝对位移时触发。例如，鼠标突然出现在某个角落。 
  */
 static void cursorMotionAbsoluteEventBridge(wl_listener* listener, void* data) {
-    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.cursorMotionAbsolute);
+    Server* server = wl_container_of(listener, server, eventListeners.cursorMotionAbsolute);
 
     auto* event = (wlr_pointer_motion_absolute_event*) data;
 
     wlr_cursor_warp_absolute(
-        compositor->wlrCursor,
+        server->wlrCursor,
         &event->pointer->base,
         event->x, event->y
     );
 
-    compositor->processCursorMotion(event->time_msec);
+    server->processCursorMotion(event->time_msec);
 }
 
 /**
  * 当鼠标按键被按下时触发。 
  */
 static void cursorButtonEventBridge(wl_listener* listener, void* data) {
-    LOG_TEMPORARY("event!!");
-    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.cursorButton);
+    
+    Server* server = wl_container_of(listener, server, eventListeners.cursorButton);
 
     auto* event = (wlr_pointer_button_event*) data;
 
     wlr_seat_pointer_notify_button(
-        compositor->wlrSeat, event->time_msec, event->button, event->state
+        server->wlrSeat, event->time_msec, event->button, event->state
     );
 
     double sx, sy;
     wlr_surface* surface = nullptr;
-    View* view = compositor->desktopViewAt(
-        compositor->wlrCursor->x, compositor->wlrCursor->y, &surface, &sx, &sy
+    View* view = server->desktopViewAt(
+        server->wlrCursor->x, server->wlrCursor->y, &surface, &sx, &sy
     );
 
     if (event->state == WLR_BUTTON_RELEASED) {
-        compositor->cursorMode = Compositor::CursorMode::PASSTHROUGH;
-        compositor->grabbedView = nullptr;
+        server->cursorMode = Server::CursorMode::PASSTHROUGH;
+        server->grabbedView = nullptr;
     } else if (event->state == WLR_BUTTON_PRESSED) {
         if (view) {
             view->focus(surface);
@@ -124,24 +138,24 @@ static void cursorButtonEventBridge(wl_listener* listener, void* data) {
  * 由坐标轴事件触发。也就是说...比如滚动鼠标滚轮的时候。 
  */
 static void cursorAxisEventBridge(wl_listener* listener, void* data) {
-    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.cursorAxis);
+    Server* server = wl_container_of(listener, server, eventListeners.cursorAxis);
 
     auto* event = (wlr_pointer_axis_event*) data;
 
     wlr_seat_pointer_notify_axis(
-        compositor->wlrSeat, event->time_msec, event->orientation,
+        server->wlrSeat, event->time_msec, event->orientation,
         event->delta, event->delta_discrete, event->source
     );
 }
 
 static void cursorFrameEventBridge(wl_listener* listener, void* data) {
-    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.cursorFrame);
+    Server* server = wl_container_of(listener, server, eventListeners.cursorFrame);
 
-    wlr_seat_pointer_notify_frame(compositor->wlrSeat);
+    wlr_seat_pointer_notify_frame(server->wlrSeat);
 }
 
 static void newInputEventBridge(wl_listener* listener, void* data) {
-    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.newInput);
+    Server* server = wl_container_of(listener, server, eventListeners.newInput);
 
     auto* device = (wlr_input_device*) data;
     if (device->type == WLR_INPUT_DEVICE_KEYBOARD) {
@@ -154,21 +168,21 @@ static void newInputEventBridge(wl_listener* listener, void* data) {
             return;
         }
 
-        keyboard->init(compositor, wlrKeyboard, device);
+        keyboard->init(server, wlrKeyboard, device);
 
     } else if (device->type == WLR_INPUT_DEVICE_POINTER) {
         LOG_INFO("new input detected: pointer");
-        wlr_cursor_attach_input_device(compositor->wlrCursor, device);
+        wlr_cursor_attach_input_device(server->wlrCursor, device);
     } else {
         LOG_INFO("input device ignored: ", device->type);
     }
     
     uint32_t capability = WL_SEAT_CAPABILITY_POINTER;
-    if (!wl_list_empty(&compositor->wlKeyboards)) {
+    if (!wl_list_empty(&server->wlKeyboards)) {
         capability |= WL_SEAT_CAPABILITY_KEYBOARD;
     }
 
-    wlr_seat_set_capabilities(compositor->wlrSeat, capability);
+    wlr_seat_set_capabilities(server->wlrSeat, capability);
 }
 
 /**
@@ -178,14 +192,14 @@ static void newInputEventBridge(wl_listener* listener, void* data) {
  * @param data 
  */
 static void requestSetCursorEventBridge(wl_listener* listener, void* data) {
-    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.requestSetCursor);
+    Server* server = wl_container_of(listener, server, eventListeners.requestSetCursor);
 
     auto* event = (wlr_seat_pointer_request_set_cursor_event*) data;
-    auto* focusedClient = compositor->wlrSeat->pointer_state.focused_client;
+    auto* focusedClient = server->wlrSeat->pointer_state.focused_client;
 
     if (focusedClient == event->seat_client) {
         wlr_cursor_set_surface(
-            compositor->wlrCursor, event->surface,
+            server->wlrCursor, event->surface,
             event->hotspot_x, event->hotspot_y
         );
     }
@@ -198,20 +212,20 @@ static void requestSetCursorEventBridge(wl_listener* listener, void* data) {
  * @param data 
  */
 static void requestSetSelectionEventBridge(wl_listener* listener, void* data) {
-    Compositor* compositor = wl_container_of(listener, compositor, eventListeners.requestSetSelection);
+    Server* server = wl_container_of(listener, server, eventListeners.requestSetSelection);
 
     // todo
 }
 
-Compositor::Compositor() {
+Server::Server() {
 
 }
 
-Compositor::~Compositor() {
+Server::~Server() {
     this->clear();
 }
 
-int Compositor::run() {
+int Server::run() {
     if (initialized) {
         return 0;
     }
@@ -316,7 +330,7 @@ int Compositor::run() {
         execl("/bin/sh", "/bin/sh", "-c", "konsole", 0);
     }
 
-    LOG_INFO("compositor running...");
+    LOG_INFO("server running...");
 
     wl_display_run(wlDisplay); // run blocking.
 
@@ -332,12 +346,12 @@ int Compositor::run() {
 }
 
 
-int Compositor::clear() {
+int Server::clear() {
     return 0;
 }
 
 
-void Compositor::newOutputEventHandler(wlr_output* newOutput) {
+void Server::newOutputEventHandler(wlr_output* newOutput) {
     wlr_output_init_render(newOutput, wlrAllocator, wlrRenderer);
 
     wlr_output_state state;
@@ -364,13 +378,12 @@ void Compositor::newOutputEventHandler(wlr_output* newOutput) {
 
 }
 
-void Compositor::processCursorMotion(uint32_t timeMsec) {
+void Server::processCursorMotion(uint32_t timeMsec) {
 
     if (cursorMode == CursorMode::MOVE) {
         processCursorMove(timeMsec);
         return;
     } else if (cursorMode == CursorMode::RESIZE) {
-        LOG_TEMPORARY("cursor resize");
         processCursorResize(timeMsec);
         return;
     }
@@ -396,15 +409,14 @@ void Compositor::processCursorMotion(uint32_t timeMsec) {
 }
 
 
-void Compositor::processCursorMove(uint32_t timeMsec) {
-    auto* topLevel = grabbedView;
+void Server::processCursorMove(uint32_t timeMsec) {
     wlr_scene_node_set_position(
-        &topLevel->wlrSceneTree->node, 
+        &grabbedView->wlrSceneTree->node, 
         wlrCursor->x - grabX, wlrCursor->y - grabY
     );
 }
 
-void Compositor::processCursorResize(uint32_t timeMsec) {
+void Server::processCursorResize(uint32_t timeMsec) {
     View* view = grabbedView;
     double borderX = wlrCursor->x - grabX;
     double borderY = wlrCursor->y - grabY;
@@ -453,7 +465,7 @@ void Compositor::processCursorResize(uint32_t timeMsec) {
     );
 }
 
-View* Compositor::desktopViewAt(
+View* Server::desktopViewAt(
     double lx, double ly, wlr_surface** surface, 
     double* sx, double* sy
 ) {
