@@ -1,4 +1,4 @@
-<svg host="65bd71144e" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="841px" height="331px" viewBox="-0.5 -0.5 841 331" content="&lt;mxfile&gt;&lt;diagram id=&quot;lg5v-rLiN0RN-y7ZnQc1&quot; name=&quot;Page-1&quot;&gt;7VfBkqIwEP2aHLcKiGA4AuLuZXYPVs2cMxAhZSBsjKL79dtAUCi0nKp1ZzzoheR1dzrd7yUCwlFx+K5olb/IlAnkWOkB4QVyHNuxfHg0yLFD5pbTAZniqXE6Ayv+hxnQMuiOp2w7ctRSCs2rMZjIsmSJHmFUKVmP3dZSjLNWNGMTYJVQMUXfeKrzDiWudcZ/MJ7lfWbbMpZ3mmwyJXelyVfKknWWgvbLGNdtTlNZDyAcIxwpKXU3Kg4RE01b+451ccsr1tOWFSv1RwLcLmBPxc5UvWfbiimzO33sm9GWw5ooC+Gwzrlmq4omjbUG+gHLdSFgZsNwLUu9pAUXDfMvfEVLoCKkgmclAAnsDTLgcM+U5tDvwBi0bNZZcyEiKaRqE2PHIv4M8oZbreSG9Za2p10moxx7ZuaDYKv9AW7KhITscLVV9okA0DSTBdPqCC71gPyZ4S0fEI+xAakRXHaKPXceBqb5l4nwJkQgxxO6qbui5YgL7/eukUdb67dtW3wADvasOrSV9nYYZc0TDtGmaa1ZD3bSLdlZe/hd/VOSu+32jR4FhZMDwo095EeILFDsIhKgwEYxRsRCBAZzFATIn7emJQpwi8Stzxz54OMNnD0UEhQ67YJL5OOrrXgU0bvpOyN0IvrhcfgM5fcBRt/mHu/lPjgXp/tseC4c/w7nYj69oMrkTpp9/RldkZmLfB8F5IEEsQhj2NuDCMIhtxUxv6AI7w6CIBNBwP8/NEU8ybpMlut9HVn+hKwVU/tHer1wPZ8k+CtfL/ozNWaJXGDJuvTycQeW+vt9QNOvna52+knTLZps5zN5sic8vXJWP1m6yZL3/1iC6flzrbUNPodx/Bc=&lt;/diagram&gt;&lt;/mxfile&gt;">
+<svg host="65bd71144e" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="841px" height="331px" viewBox="-0.5 -0.5 841 331" content="&lt;mxfile&gt;&lt;diagram id=&quot;lg5v-rLiN0RN-y7ZnQc1&quot; name=&quot;Page-1&quot;&gt;7VdNj5swEP01PlYCHIg5QkK2l+0lUvfsgANWDKbG+eqv7wAmAUG0kZo2UVUumDdjz3jeGwMIL/LTm6Jl9i4TJpBjJSeEl8hxbOJ4cKuRs0Esl7RIqnhisCuw5j9Z52jQPU9YNXDUUgrNyyEYy6JgsR5gVCl5HLptpRhGLWnKRsA6pmKMfvBEZy1KXOuKf2U8zbrItmUsGxrvUiX3hYlXyIK1lpx2yxjXKqOJPPYgHCG8UFLqdpSfFkzUde0q1s5b3bBeUlas0PdMcNsJByr2ZtcHVpVMmez0uStGsx1Wz7IQDo8Z12xd0ri2HoF/wDKdC3iyYbiVhV7RnIua+ne+pgVQEVLB0wKAGHKDCDg8MKU51DswBi3rdbZciIUUUjWBsWMRfwZxw0oruWOdpalpG8kox56Z595kq7kAH9fFlKrOgZ16kKnTG5M50+oMLsce+TPDW9YjHmMDUiO49DL3WnkYmOJPE+GNiECOJ3S975IWAy68H/taHs1ev1TN5gNwsGflqdlpZ4dRWt+hiXZ1ac16kEm7ZGvt4I36rSAPy/aDngWFzgHhRh7yF4gsUeQiEqDARhFGxEIEBnMUBMifN6YVCnCDRI3PHPng4/WcPRQSFDrNgivk45uleBXRu8mGEToSfb8d/obyO6vRtznIO7n3+uJynvX7wvEf0Bfz8QFVxA/S7Pdvixsyc5Hvo4C8kCCWYQS5vYggHO9zRcwnFOE9QBBkJAh4/0NRxH+ypslyn0iWPyKrYupQf15cG/ieY/+Z/ZjzJBFsgmXPJzF+5odJ141DfskEv9YEv+4D+LXtMcFQSDbm96439r9K74jLCcbvpdee/Tl+4fH669HYev92OPoF&lt;/diagram&gt;&lt;/mxfile&gt;">
     <defs/>
     <g>
         <rect x="0" y="0" width="840" height="330" fill="#20894d" stroke="none" pointer-events="all"/>
@@ -41,11 +41,11 @@
                 </text>
             </switch>
         </g>
-        <rect x="280" y="30" width="270" height="60" fill="#5dbe8a" stroke="#20894d" pointer-events="all"/>
+        <rect x="260" y="30" width="270" height="60" fill="#5dbe8a" stroke="#20894d" pointer-events="all"/>
         <g transform="translate(-0.5 -0.5)">
             <switch>
                 <foreignObject pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility" style="overflow: visible; text-align: left;">
-                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe flex-start; justify-content: unsafe center; width: 268px; height: 1px; padding-top: 37px; margin-left: 281px;">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe flex-start; justify-content: unsafe center; width: 268px; height: 1px; padding-top: 37px; margin-left: 261px;">
                         <div data-drawio-colors="color: #000000; " style="box-sizing: border-box; font-size: 0px; text-align: center;">
                             <div style="display: inline-block; font-size: 14px; font-family: MiSans; color: rgb(0, 0, 0); line-height: 1.2; pointer-events: all; white-space: normal; overflow-wrap: normal;">
                                 vnc
@@ -55,7 +55,7 @@
                         </div>
                     </div>
                 </foreignObject>
-                <text x="415" y="51" fill="#000000" font-family="MiSans" font-size="14px" text-anchor="middle">
+                <text x="395" y="51" fill="#000000" font-family="MiSans" font-size="14px" text-anchor="middle">
                     vnc...
                 </text>
             </switch>
@@ -77,54 +77,41 @@
                 </text>
             </switch>
         </g>
-        <rect x="20" y="80" width="200" height="30" fill="#5698c3" stroke="none" pointer-events="all"/>
+        <rect x="20" y="80" width="200" height="50" fill="#5698c3" stroke="none" pointer-events="all"/>
         <g transform="translate(-0.5 -0.5)">
             <switch>
                 <foreignObject pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility" style="overflow: visible; text-align: left;">
-                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe flex-start; justify-content: unsafe center; width: 198px; height: 1px; padding-top: 87px; margin-left: 21px;">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 198px; height: 1px; padding-top: 105px; margin-left: 21px;">
                         <div data-drawio-colors="color: #000000; " style="box-sizing: border-box; font-size: 0px; text-align: center;">
                             <div style="display: inline-block; font-size: 14px; font-family: MiSans; color: rgb(0, 0, 0); line-height: 1.2; pointer-events: all; white-space: normal; overflow-wrap: normal;">
-                                Server
+                                server
+                                <br/>
+                                Wayland 服务器
                             </div>
                         </div>
                     </div>
                 </foreignObject>
-                <text x="120" y="101" fill="#000000" font-family="MiSans" font-size="14px" text-anchor="middle">
-                    Server
+                <text x="120" y="109" fill="#000000" font-family="MiSans" font-size="14px" text-anchor="middle">
+                    server...
                 </text>
             </switch>
         </g>
-        <rect x="20" y="120" width="200" height="30" fill="#5698c3" stroke="none" pointer-events="all"/>
+        <rect x="20" y="140" width="200" height="50" fill="#5698c3" stroke="none" pointer-events="all"/>
         <g transform="translate(-0.5 -0.5)">
             <switch>
                 <foreignObject pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility" style="overflow: visible; text-align: left;">
-                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe flex-start; justify-content: unsafe center; width: 198px; height: 1px; padding-top: 127px; margin-left: 21px;">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 198px; height: 1px; padding-top: 165px; margin-left: 21px;">
                         <div data-drawio-colors="color: #000000; " style="box-sizing: border-box; font-size: 0px; text-align: center;">
                             <div style="display: inline-block; font-size: 14px; font-family: MiSans; color: rgb(0, 0, 0); line-height: 1.2; pointer-events: all; white-space: normal; overflow-wrap: normal;">
-                                Output
+                                scene
+                                <br/>
+                                窗口管理
                             </div>
                         </div>
                     </div>
                 </foreignObject>
-                <text x="120" y="141" fill="#000000" font-family="MiSans" font-size="14px" text-anchor="middle">
-                    Output
-                </text>
-            </switch>
-        </g>
-        <rect x="20" y="160" width="200" height="30" fill="#5698c3" stroke="none" pointer-events="all"/>
-        <g transform="translate(-0.5 -0.5)">
-            <switch>
-                <foreignObject pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility" style="overflow: visible; text-align: left;">
-                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe flex-start; justify-content: unsafe center; width: 198px; height: 1px; padding-top: 167px; margin-left: 21px;">
-                        <div data-drawio-colors="color: #000000; " style="box-sizing: border-box; font-size: 0px; text-align: center;">
-                            <div style="display: inline-block; font-size: 14px; font-family: MiSans; color: rgb(0, 0, 0); line-height: 1.2; pointer-events: all; white-space: normal; overflow-wrap: normal;">
-                                View
-                            </div>
-                        </div>
-                    </div>
-                </foreignObject>
-                <text x="120" y="181" fill="#000000" font-family="MiSans" font-size="14px" text-anchor="middle">
-                    View
+                <text x="120" y="169" fill="#000000" font-family="MiSans" font-size="14px" text-anchor="middle">
+                    scene...
                 </text>
             </switch>
         </g>

@@ -37,3 +37,20 @@ enum wlr_scene_node_type {
 TREE 表示该 node 仅用于记录节点基本信息，如节点间的父母关系。
 
 BUFER 表示该节点用于保存图像缓冲信息。
+
+### 场景树模型
+
+每个 scene 内部都有一棵场景树。树的节点可以是 buffer、tree 或 rect。其中，树根一定是 tree，所有非叶节点也必须是 tree。buffer 和 rect 可以是叶节点，而他们的上级节点类型一定是 tree。
+
+## scene_damage_outputs
+
+将所有 damage 合并起来。如果 damage 成功被合并（即确实需要更新画面），就进行如下顺序操作：
+
+```
+scene_damage_outputs
+  -> wlr_output_schedule_frame
+    -> schedule_frame_handle_idle_timer
+      -> output.frame.event
+```
+
+

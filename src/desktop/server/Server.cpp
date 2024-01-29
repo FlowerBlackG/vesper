@@ -12,6 +12,8 @@
 
 #include "../../log/Log.h"
 #include "./View.h"
+#include "../scene/Scene.h"
+#include "../scene/SceneNode.h"
 
 #include <unistd.h>
 using namespace std;
@@ -144,7 +146,8 @@ static void cursorAxisEventBridge(wl_listener* listener, void* data) {
 
     wlr_seat_pointer_notify_axis(
         server->wlrSeat, event->time_msec, event->orientation,
-        event->delta, event->delta_discrete, event->source
+        event->delta, event->delta_discrete, event->source,
+        event->relative_direction
     );
 }
 
@@ -231,7 +234,15 @@ int Server::run() {
     }
 
     this->wlDisplay = wl_display_create();
-    this->wlrBackend = wlr_backend_autocreate(wlDisplay, nullptr);
+    auto waylandEventLoop = wl_display_get_event_loop(wlDisplay);
+    
+    bool headless = false; // todo
+    if (headless) {
+        this->wlrBackend = wlr_headless_backend_create(waylandEventLoop);
+    } else {
+        this->wlrBackend = wlr_backend_autocreate(waylandEventLoop, nullptr);
+    }
+
     if (!wlrBackend) {
         LOG_ERROR("failed to create wlroots backend!");
         return -1;
@@ -262,8 +273,17 @@ int Server::run() {
     eventListeners.newOutput.notify = newOutputEventBridge; 
     wl_signal_add(&wlrBackend->events.new_output, &eventListeners.newOutput);
 
-    wlrScene = wlr_scene_create();
-    wlrSceneLayout = wlr_scene_attach_output_layout(wlrScene, wlrOutputLayout);
+    scene = vesper::desktop::scene::Scene::create();
+    if (!scene) {
+        LOG_ERROR("failed to alloc scene!");
+        return -1;
+    }
+    
+    sceneLayout = scene->attachWlrOutputLayout(wlrOutputLayout);
+    if (!sceneLayout) {
+        LOG_ERROR("failed to attach wlr output layout!");
+        return -1;
+    }
 
     // xdg shell
     wl_list_init(&views);
@@ -300,7 +320,7 @@ int Server::run() {
     wl_list_init(&wlKeyboards);
     eventListeners.newInput.notify = newInputEventBridge;
     wl_signal_add(&wlrBackend->events.new_input, &eventListeners.newInput);
-    wlrSeat = wlr_seat_create(wlDisplay, "seat0"); // todo: 真的是 seat0 么？
+    wlrSeat = wlr_seat_create(wlDisplay, "seat0");
     eventListeners.requestSetCursor.notify = requestSetCursorEventBridge;
     wl_signal_add(&wlrSeat->events.request_set_cursor, &eventListeners.requestSetCursor);
     eventListeners.requestSetSelection.notify = requestSetSelectionEventBridge;
@@ -327,7 +347,7 @@ int Server::run() {
 
     setenv("WAYLAND_DISPLAY", socket, true); 
     if (fork() == 0) {
-        execl("/bin/sh", "/bin/sh", "-c", "konsole", 0);
+        execl("/bin/sh", "/bin/sh", "-c", "konsole", nullptr);
     }
 
     LOG_INFO("server running...");
@@ -337,7 +357,8 @@ int Server::run() {
     // clean up.
 
     wl_display_destroy_clients(wlDisplay);
-    wlr_scene_node_destroy(&wlrScene->tree.node);
+    scene->destroyTree();
+    
     wlr_xcursor_manager_destroy(wlrXCursorMgr);
 
     wl_display_destroy(wlDisplay);

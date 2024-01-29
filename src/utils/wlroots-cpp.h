@@ -40,6 +40,8 @@ extern "C" {
 
     #include <wlr/util/log.h>
 
+    #include <wlr/backend/headless.h>
+    #include <wlr/render/pixman.h>
 
 #undef static
 }

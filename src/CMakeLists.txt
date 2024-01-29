@@ -30,14 +30,12 @@ configure_file(
     ${PROJECT_SOURCE_DIR}/config.h
 )
 
-set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/../cmake-modules)
-
 # 指定使用 C++17
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
-include_directories(${PROJECT_SOURCE_DIR})
 
+include_directories(${PROJECT_SOURCE_DIR})
 
 
 #[[ 
@@ -51,14 +49,16 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
     项目构造产物
 ]]
 file(GLOB_RECURSE CPP_SOURCE_FILES *.cpp)
+file(GLOB_RECURSE C_SOURCE_FILES *.c)
 add_executable(
-    ${PROJECT_NAME} ${CPP_SOURCE_FILES}
+    ${PROJECT_NAME} ${CPP_SOURCE_FILES} ${C_SOURCE_FILES}
 )
 
 
 #[[ 
-    依赖库
+    寻找依赖库
 ]]
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/../cmake-modules)
 find_package(Wayland REQUIRED)
 find_package(Pixman REQUIRED)
 find_package(Wlroots REQUIRED)
@@ -67,7 +67,35 @@ find_package(LibVNCServer REQUIRED)
 
 find_package(WaylandProtocols REQUIRED)
 
-# wayland protocols
+#[[
+    关联依赖库
+]]
+
+include_directories(
+    ${WAYLAND_INCLUDE_DIR} 
+    ${WLR_INCLUDE_DIRS} 
+    ${XKB_INCLUDE_DIRS} 
+    ${PIXMAN_INCLUDE_DIRS}
+
+    ${WAYLAND_PROTOCOLS_GEN_DIR}
+)
+
+
+target_link_libraries(
+    ${PROJECT_NAME} 
+
+    ${WAYLAND_LIBRARIES} 
+    ${WLR_LIBRARIES} 
+    ${XKB_LIBRARIES} 
+    ${PIXMAN_LIBRARIES}
+    LibVNCServer::vncserver
+)
+
+
+#[[
+    wayland protocols
+]]
+
 set(XDG_PROTOCOL_DEF "${WAYLANDPROTOCOLS_PATH}/stable/xdg-shell/xdg-shell.xml")
 
 set(WAYLAND_PROTOCOLS_GEN_DIR ${CMAKE_BINARY_DIR}/wayland-protocols)
@@ -93,23 +121,3 @@ add_custom_command(
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${WAYLAND_PROTOCOLS_GEN_DIR})
 target_sources(${PROJECT_NAME} PRIVATE ${WAYLAND_PROTOCOLS_GEN_DIR}/xdg-shell-protocol.c)
-
-include_directories(
-    ${WAYLAND_INCLUDE_DIR} 
-    ${WLR_INCLUDE_DIRS} 
-    ${XKB_INCLUDE_DIRS} 
-    ${PIXMAN_INCLUDE_DIRS}
-
-    ${WAYLAND_PROTOCOLS_GEN_DIR}
-)
-
-
-target_link_libraries(
-    ${PROJECT_NAME} 
-
-    ${WAYLAND_LIBRARIES} 
-    ${WLR_LIBRARIES} 
-    ${XKB_LIBRARIES} 
-    ${PIXMAN_LIBRARIES}
-    LibVNCServer::vncserver
-)

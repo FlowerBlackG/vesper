@@ -11,6 +11,9 @@
 #include "../../utils/wlroots-cpp.h"
 #include "./Output.h"
 
+namespace vesper::desktop::scene { class Scene; }
+namespace vesper::desktop::scene { class OutputLayout; }
+
 namespace vesper::desktop::server {
     
 class View;
@@ -59,8 +62,8 @@ public:
     wlr_allocator* wlrAllocator = nullptr;
     wlr_output_layout* wlrOutputLayout = nullptr;
 
-    wlr_scene* wlrScene = nullptr;
-    wlr_scene_output_layout* wlrSceneLayout = nullptr;
+    vesper::desktop::scene::Scene* scene = nullptr;
+    vesper::desktop::scene::OutputLayout* sceneLayout = nullptr;
 
     wl_list wlOutputs;
 
