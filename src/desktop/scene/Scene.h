@@ -34,6 +34,10 @@ public:
 
     void destroyTree();
 
+    void updateRegion(pixman_region32_t* updateRegion);
+    void damageOutputs(pixman_region32_t* damage);
+
+
 public:
     SceneTreeNode* tree = nullptr;
 
@@ -41,6 +45,8 @@ public:
      * 成员类型：SceneOutput
      */
     wl_list outputs;
+
+    bool calculateVisibility;
 
 };
 

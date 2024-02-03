@@ -12,6 +12,7 @@
 #pragma once
 
 #include <iostream>
+#include <cstdlib>
 #include "../utils/ConsoleColorPad.h"
 
 
@@ -89,5 +90,14 @@ inline void setColorError() {
         ConsoleColorPad::setClogColor(128, 128, 255); \
         LOG_PLAIN(__VA_ARGS__); \
         vesper::log::resetColor(); \
+    }
+#endif
+
+#if 1
+    #define TODO(...) { \
+        ConsoleColorPad::setClogColor(255, 192, 192); \
+        LOG_PLAIN("TODO: ", __VA_ARGS__); \
+        vesper::log::resetColor(); \
+        exit(-1); \
     }
 #endif

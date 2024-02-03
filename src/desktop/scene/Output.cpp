@@ -7,6 +7,8 @@
  */
 
 #include "./Output.h"
+#include "./Scene.h"
+#include "./SceneNode.h"
 
 using namespace std;
 
@@ -20,35 +22,39 @@ void Output::setPosition(int x, int y) {
     this->position.x = x;
     this->position.y = y;
 
-    updateGeometry();
+    updateGeometry(false);
     
 }
 
-void Output::updateGeometry() {
+void Output::updateGeometry(bool forceUpdate) {
     wlr_damage_ring_add_whole(&wlrDamageRing);
     wlr_output_schedule_frame(wlrOutput);
 
-    // todo: scene node output update
+    this->scene->tree->outputUpdate(
+        &this->scene->outputs, 
+        nullptr, 
+        forceUpdate ? this : nullptr
+    );
 }
 
 void Output::destroy() {
 
     wl_signal_emit_mutable(&events.destroy, nullptr);
 
-    // todo: scene node output update
+    this->scene->tree->outputUpdate(&scene->outputs, this, nullptr);
 
-
-
-    // todo
+    // todo: highlight region
 
     wlr_damage_ring_finish(&wlrDamageRing);
     
-    // todo
+    pixman_region32_fini(&pendingCommitDamage);
 
     wl_list_remove(&link);
     wl_list_remove(&eventListeners.outputCommit.link);
     wl_list_remove(&eventListeners.outputDamage.link);
     wl_list_remove(&eventListeners.outputNeedsFrame.link);
+
+    wl_array_release(&this->renderList);
 }
 
 }

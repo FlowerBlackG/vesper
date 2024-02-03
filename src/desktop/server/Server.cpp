@@ -63,7 +63,7 @@ static void newXdgPopupEventBridge(wl_listener* listener, void* data) {
     auto* xdgPopup = (wlr_xdg_popup*) data;
 
     wlr_xdg_surface* parent = wlr_xdg_surface_try_from_wlr_surface(xdgPopup->parent);
-LOG_TEMPORARY("popup: ", xdgPopup->base, " <- ", parent);
+
     if (!parent) {
         LOG_ERROR("no parent for popup!");
         return;
@@ -431,11 +431,9 @@ void Server::processCursorMotion(uint32_t timeMsec) {
 
 
 void Server::processCursorMove(uint32_t timeMsec) {
-    wlr_scene_node_set_position(
-        &grabbedView->wlrSceneTree->node, 
-        wlrCursor->x - grabX, wlrCursor->y - grabY
-    );
+    grabbedView->sceneTree->setPosition(wlrCursor->x - grabX, wlrCursor->y - grabY);
 }
+
 
 void Server::processCursorResize(uint32_t timeMsec) {
     View* view = grabbedView;
@@ -472,11 +470,8 @@ void Server::processCursorResize(uint32_t timeMsec) {
 
     wlr_box geoBox;
     wlr_xdg_surface_get_geometry(view->wlrXdgToplevel->base, &geoBox);
-    wlr_scene_node_set_position(
-        &view->wlrSceneTree->node,
-        newLeft - geoBox.x,
-        newTop - geoBox.y 
-    );
+
+    view->sceneTree->setPosition(newLeft - geoBox.x, newTop - geoBox.y);
 
     int newWidth = newRight - newLeft;
     int newHeight = newBottom - newTop;

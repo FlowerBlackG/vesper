@@ -9,6 +9,8 @@
 
 #include "./Output.h"
 #include "../../log/Log.h"
+#include "../scene/SceneNode.h"
+#include "../scene/Scene.h"
 
 #include "./Server.h"
 
@@ -18,7 +20,7 @@ namespace vesper::desktop::server {
 
 static void frameEventBridge(wl_listener* listener, void* data) {
    
-   Output* output = wl_container_of(listener, output, eventListeners.frame);
+    Output* output = wl_container_of(listener, output, eventListeners.frame);
 
     output->frameEventHandler();
 }

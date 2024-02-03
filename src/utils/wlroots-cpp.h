@@ -30,9 +30,9 @@ extern "C" {
     #include <wlr/types/wlr_pointer.h>
     #include <wlr/types/wlr_seat.h>
     #include <wlr/types/wlr_xcursor_manager.h>
+    #include <wlr/types/wlr_damage_ring.h>
     #include <wlr/types/wlr_xdg_shell.h>
-
-    #include <wlr/types/wlr_scene.h>
+    #include <wlr/types/wlr_buffer.h>
 
     #include <wlr/backend.h>
     #include <wlr/render/wlr_renderer.h>

@@ -9,6 +9,8 @@
 #include "./View.h"
 #include "../../log/Log.h"
 #include "./Server.h"
+#include "../scene/SceneNode.h"
+#include "../scene/Scene.h"
 using namespace std;
 
 namespace vesper::desktop::server {
@@ -99,7 +101,7 @@ static void xdgToplevelrequestMaximizeEventBridge(wl_listener* listener, void* d
         int targetHeight = output->wlrOutput->height;
         int targetWidth = output->wlrOutput->width;
 
-        wlr_scene_node_set_position(&view->wlrSceneTree->node, 0, 0);
+        view->sceneTree->setPosition(0, 0);
         wlr_xdg_toplevel_set_size(view->wlrXdgToplevel, targetWidth, targetHeight);
 
         // todo
@@ -198,25 +200,25 @@ void View::beginInteraction(Server::CursorMode cursorMode, uint32_t edges) {
     server->cursorMode = cursorMode;
 
     if (cursorMode == Server::CursorMode::MOVE) {
-        server->grabX = server->wlrCursor->x - wlrSceneTree->node.x;
-        server->grabY = server->wlrCursor->y - wlrSceneTree->node.y;
+        server->grabX = server->wlrCursor->x - sceneTree->offset.x;
+        server->grabY = server->wlrCursor->y - sceneTree->offset.y;
     } else { // resize
         
         wlr_box geoBox;
         wlr_xdg_surface_get_geometry(wlrXdgToplevel->base, &geoBox);
 
-        double borderX = wlrSceneTree->node.x + geoBox.x;
+        double borderX = sceneTree->offset.x + geoBox.x;
         borderX += ((edges & WLR_EDGE_RIGHT) ? geoBox.width : 0);
 
-        double borderY = wlrSceneTree->node.y + geoBox.y;
+        double borderY = sceneTree->offset.y + geoBox.y;
         borderY += ((edges & WLR_EDGE_BOTTOM) ? geoBox.height : 0);
 
         server->grabX = server->wlrCursor->x - borderX;
         server->grabY = server->wlrCursor->y - borderY;
 
         server->grabGeoBox = geoBox;
-        server->grabGeoBox.x += wlrSceneTree->node.x;
-        server->grabGeoBox.y += wlrSceneTree->node.y;
+        server->grabGeoBox.x += sceneTree->offset.x;
+        server->grabGeoBox.y += sceneTree->offset.y;
 
         server->resizeEdges = edges;
     }

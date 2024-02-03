@@ -11,6 +11,8 @@
 #include "../../utils/wlroots-cpp.h"
 #include "./Server.h"
 
+namespace vesper::desktop::scene { class SceneTreeNode; }
+
 namespace vesper::desktop::server {
 
 /**
@@ -35,7 +37,9 @@ public:
     wl_list link;
     Server* server;
     wlr_xdg_toplevel* wlrXdgToplevel;
-    wlr_scene_tree* wlrSceneTree;
+
+    vesper::desktop::scene::SceneTreeNode* sceneTree;
+    // todo: delete this line! //wlr_scene_tree* wlrSceneTree;
 
 
     struct {

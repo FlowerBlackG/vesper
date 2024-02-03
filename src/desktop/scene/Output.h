@@ -18,7 +18,7 @@ class Output {
 
 public:
     void setPosition(int x, int y);
-    void updateGeometry();
+    void updateGeometry(bool forceUpdate);
 
 public:
     void destroy();
@@ -51,9 +51,13 @@ public:
         int y;
     } position;
 
-    // todo
+    pixman_region32_t pendingCommitDamage;
 
-};
+    uint8_t index;
 
-}
+    wl_array renderList;
+
+}; // class Output
+
+} // namespace vesper::desktop::scene
 
