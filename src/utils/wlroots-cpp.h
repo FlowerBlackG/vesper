@@ -36,6 +36,7 @@ extern "C" {
 
     #include <wlr/backend.h>
     #include <wlr/render/wlr_renderer.h>
+    #include <wlr/render/pixman.h>
     #include <wlr/render/allocator.h>
 
     #include <wlr/util/log.h>

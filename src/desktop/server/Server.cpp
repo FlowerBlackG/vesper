@@ -144,7 +144,8 @@ static void cursorAxisEventBridge(wl_listener* listener, void* data) {
 
     wlr_seat_pointer_notify_axis(
         server->wlrSeat, event->time_msec, event->orientation,
-        event->delta, event->delta_discrete, event->source
+        event->delta, event->delta_discrete, event->source,
+        event->relative_direction
     );
 }
 
@@ -231,13 +232,13 @@ int Server::run() {
     }
 
     this->wlDisplay = wl_display_create();
-    this->wlrBackend = wlr_backend_autocreate(wlDisplay, nullptr);
+    this->wlrBackend = wlr_backend_autocreate(wl_display_get_event_loop(wlDisplay), nullptr);
     if (!wlrBackend) {
         LOG_ERROR("failed to create wlroots backend!");
         return -1;
     }
 
-    this->wlrRenderer = wlr_renderer_autocreate(wlrBackend);
+    this->wlrRenderer = wlr_pixman_renderer_create();
     if (!wlrRenderer) {
         LOG_ERROR("failed to create wlroots renderer!");
         return -1;
