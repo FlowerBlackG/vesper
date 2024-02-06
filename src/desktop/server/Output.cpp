@@ -11,10 +11,13 @@
 #include "../../log/Log.h"
 #include "../scene/SceneNode.h"
 #include "../scene/Scene.h"
+#include "../scene/Output.h"
+#include "../scene/OutputLayout.h"
 
 #include "./Server.h"
 
 using namespace std;
+using namespace vesper::desktop;
 
 namespace vesper::desktop::server {
 
@@ -68,8 +71,14 @@ int Output::init(Server* server, wlr_output* output) {
     wlr_output_layout_output* layoutOutput = wlr_output_layout_add_auto(
         server->wlrOutputLayout, wlrOutput
     );
-    wlr_scene_output* sceneOutput = wlr_scene_output_create(server->wlrScene, wlrOutput);
-    wlr_scene_output_layout_add_output(server->wlrSceneLayout, layoutOutput, sceneOutput);
+
+    scene::Output* sceneOutput = scene::Output::create(server->scene, output);
+    if (sceneOutput == nullptr) {
+        LOG_ERROR("failed to create scene output!");
+        return -1;
+    }
+
+    server->sceneLayout->addOutput(layoutOutput, sceneOutput);
 
     LOG_INFO("server new output added.")
 
@@ -78,15 +87,15 @@ int Output::init(Server* server, wlr_output* output) {
 
 
 void Output::frameEventHandler() {
-    wlr_scene* scene = server->wlrScene;
+    scene::Scene* scene = server->scene;
 
-    wlr_scene_output* sceneOutput = wlr_scene_get_scene_output(scene, wlrOutput);
+    scene::Output* sceneOutput = scene->getSceneOutput(this->wlrOutput);
 
-    wlr_scene_output_commit(sceneOutput, nullptr);
-
+    sceneOutput->commit(nullptr);
+    
     timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
-    wlr_scene_output_send_frame_done(sceneOutput, &now);
+    sceneOutput->sendFrameDone(&now);
 
 }
 

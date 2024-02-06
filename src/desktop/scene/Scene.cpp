@@ -42,6 +42,8 @@ int Scene::init() {
         return -1;
     }
 
+    tree->rootScene = this;
+
     wl_list_init(&outputs);
 
     return 0;
@@ -81,6 +83,39 @@ struct SceneUpdateData {
 };
 
 
+static bool sceneUpdateRegionNodeUpdateOnDiscover(
+    SceneNode* node, int x, int y, void* data
+) {
+    auto* updateData = (SceneUpdateData*) data;
+    wlr_box box = { .x = x, .y = y };
+    node->getSize(&box.width, &box.height);
+
+    pixman_region32_subtract(
+        &node->visibleArea, &node->visibleArea, updateData->updateRegion
+    );
+    
+    pixman_region32_union(
+        &node->visibleArea, &node->visibleArea, updateData->visible
+    );
+
+    pixman_region32_intersect_rect(
+        &node->visibleArea, &node->visibleArea, x, y, box.width, box.height
+    );
+
+    if (updateData->calculateVisibility) {
+        pixman::Region32 opaque;
+        node->opaqueRegion(x, y, opaque.raw());
+        pixman_region32_subtract(
+            updateData->visible, updateData->visible, opaque.raw()
+        );
+    }
+
+    node->updateNodeUpdateOutputs(updateData->outputs, nullptr, nullptr);
+
+    return false; // 确保遍历完所有 rect 和 buffer 节点。
+}
+
+
 void Scene::updateRegion(pixman_region32_t* updateRegion) {
 
     pixman::Region32 visible;
@@ -102,40 +137,7 @@ void Scene::updateRegion(pixman_region32_t* updateRegion) {
     };
 
     this->tree->nodesInBox(
-        &box,
-
-        [] (SceneNode* node, int x, int y, void* data) {
-            auto* updateData = (SceneUpdateData*) data;
-            wlr_box box = { .x = x, .y = y };
-            node->getSize(&box.width, &box.height);
-
-            pixman_region32_subtract(
-                &node->visibleArea, &node->visibleArea, updateData->updateRegion
-            );
-            
-            pixman_region32_union(
-                &node->visibleArea, &node->visibleArea, updateData->visible
-            );
-
-            pixman_region32_intersect_rect(
-                &node->visibleArea, &node->visibleArea, x, y, box.width, box.height
-            );
-
-            if (updateData->calculateVisibility) {
-                pixman::Region32 opaque;
-                node->opaqueRegion(x, y, opaque.raw());
-                pixman_region32_subtract(
-                    updateData->visible, updateData->visible, opaque.raw()
-                );
-            }
-
-            node->updateNodeUpdateOutputs(updateData->outputs, nullptr, nullptr);
-
-            return false; // 确保遍历完所有 rect 和 buffer 节点。
-
-        }, // [] (SceneNode* node, int x, int y, void* data) { ... }
-        
-        &data
+        &box, sceneUpdateRegionNodeUpdateOnDiscover, &data
     );
 
 }
@@ -161,5 +163,17 @@ void Scene::damageOutputs(pixman_region32_t* damage) {
     }
 
 }
+
+
+Output* Scene::getSceneOutput(wlr_output* output) {
+    wlr_addon* addon = wlr_addon_find(&output->addons, this, &sceneOutputAddonImpl);
+    if (addon == nullptr) {
+        return nullptr;
+    }
+
+    Output* sceneOutput = wl_container_of(addon, sceneOutput, addon);
+    return sceneOutput;
+}
+
 
 }

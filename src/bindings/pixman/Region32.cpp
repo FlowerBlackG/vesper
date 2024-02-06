@@ -53,6 +53,13 @@ bool Region32::intersectRect(
 
 
 bool Region32::intersectRect(
+    Region32& source, wlr_fbox& box
+) {
+    return intersectRect(source, box.x, box.y, box.width, box.height);
+}
+
+
+bool Region32::intersectRect(
     pixman_region32_t* source, wlr_box& box
 ) {
     return intersectRect(source, box.x, box.y, box.width, box.height);

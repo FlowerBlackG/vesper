@@ -22,20 +22,26 @@ namespace vesper::desktop::scene {
 /* ------------ SceneNode 公共方法 开始 ------------ */
 
 int SceneNode::init(SceneTreeNode* parent) {
+
     this->parent = parent;
-    wl_signal_init(&events.destroy);
+    wl_signal_init(&basicEvents.destroy);
     wl_list_init(&link);
     pixman_region32_init(&visibleArea);
 
     if (parent) {
         wl_list_insert(parent->children.prev, &link); // 尾插。
     }
+
+    wlr_addon_set_init(&this->addons);
+
+    return 0;
 }
 
 
 void SceneNode::destroy(std::function<void(Scene*)> typeDestroy) {
-    wl_signal_emit_mutable(&events.destroy, nullptr);
-    // todo: wlr_addon_set_finish(&node->addons);
+    wl_signal_emit_mutable(&basicEvents.destroy, nullptr);
+    
+    wlr_addon_set_finish(&this->addons);
 
     this->setEnabled(false);
 
@@ -53,7 +59,7 @@ Scene* SceneNode::getRootScene() {
         node = node->parent;
     }
 
-    Scene* scene = wl_container_of(node, scene, tree);
+    Scene* scene = ((SceneTreeNode*) node)->rootScene;
     return scene;
 }
 
@@ -327,6 +333,128 @@ void SceneNode::opaqueRegion(int x, int y, pixman_region32_t* opaque) {
     pixman_region32_init_rect(opaque, x, y, width, height);
 }
 
+
+void SceneNode::sendFrameDone(Output* sceneOutput, timespec* now) {
+    if (!enabled) {
+        return;
+    }
+
+    if (type() == SceneNodeType::BUFFER) {
+
+        auto* p = (SceneBufferNode*) this;
+        if (p->primaryOutput == sceneOutput) {
+            if (pixman_region32_not_empty(&p->visibleArea)) {
+                wl_signal_emit_mutable(&p->events.frameDone, now);
+            }
+        }
+
+    } else if (type() == SceneNodeType::TREE) {
+        auto* p = (SceneTreeNode*) this;
+        SceneNode* child;
+        wl_list_for_each(child, &p->children, link) {
+            child->sendFrameDone(sceneOutput, now);
+        }
+    }
+}
+
+
+void SceneNode::placeAbove(SceneNode* sibling) {
+
+    if (link.prev == &sibling->link) {
+        return;
+    }
+
+    wl_list_remove(&this->link);
+    wl_list_insert(&sibling->link, &this->link);
+    this->update(nullptr);
+}
+
+
+void SceneNode::placeBelow(SceneNode* sibling) {
+
+    if (link.next == &sibling->link) {
+        return;
+    }
+
+    wl_list_remove(&this->link);
+    wl_list_insert(sibling->link.prev, &this->link);
+    this->update(nullptr);
+}
+
+
+void SceneNode::raiseToTop() {
+    SceneNode* currentTop = wl_container_of(
+        parent->children.prev, currentTop, link
+    );
+
+    if (currentTop != this) {
+        this->placeAbove(currentTop);
+    }
+
+}
+
+
+void SceneNode::lowerToBottom() {
+    SceneNode* currentBottom = wl_container_of(
+        parent->children.next, currentBottom, link
+    );
+
+    if (this != currentBottom) {
+        this->placeBelow(currentBottom);
+    }
+
+}
+
+
+struct NodeAtData {
+    double lx, ly;
+    double rx, ry;
+    SceneNode* node;
+};
+
+
+static bool sceneNodeAtOnDiscover(SceneNode* node, int lx, int ly, void* data) {
+    auto* atData = (NodeAtData*) data;
+
+    double rx = atData->lx - lx;
+    double ry = atData->ly - ly;
+
+    if (node->type() == SceneNodeType::BUFFER) {
+        auto* buf = (SceneBufferNode*) node;
+
+        if (false) {
+            return false; // todo: point_accepts_input
+        }
+    }
+
+    atData->rx = rx;
+    atData->ry = ry;
+    atData->node = node;
+    return true;
+}
+
+
+SceneNode* SceneNode::nodeAt(double lx, double ly, double* nx, double* ny) {
+    wlr_box box = {
+        .x = floor(lx),
+        .y = floor(ly),
+        .width = 1,
+        .height = 1
+    };
+
+    NodeAtData data = {
+        .lx = lx,
+        .ly = ly
+    };
+
+    if (this->nodesInBox(&box, sceneNodeAtOnDiscover, &data)) {
+
+    }
+
+    return nullptr;
+}
+
+
 /* ------------ SceneNode 公共方法 结束 ------------ */
 
 
@@ -377,7 +505,7 @@ void SceneTreeNode::destroy() {
             } else if (child->type() == SceneNodeType::RECT) {
                 ((SceneRectNode*) child)->destroy();
             } else {
-                LOG_ERROR("bad type for scene node: ", child->type());
+                LOG_ERROR("bad type for scene node: ", (int64_t) child->type());
             }
 
             delete child;
@@ -392,6 +520,42 @@ void SceneTreeNode::destroy() {
 
 
 /* ------------ SceneBufferNode 开始 ------------ */
+
+static void bufferReleaseEventBridge(wl_listener* listener, void* data);
+
+
+static void sceneBufferNodeSetBuffer(SceneBufferNode* buf, wlr_buffer* wlrBuffer) {
+    wl_list_remove(&buf->eventListeners.bufferRelease.link);
+    wl_list_init(&buf->eventListeners.bufferRelease.link);
+    if (buf->ownBuffer) {
+        wlr_buffer_unlock(buf->wlrBuffer);
+    }
+
+    buf->wlrBuffer = nullptr;
+    buf->ownBuffer = false;
+    buf->bufferWidth = buf->bufferHeight = 0;
+    buf->bufferIsOpaque = false;
+
+    if (!wlrBuffer) {
+        return;
+    }
+
+    buf->ownBuffer = true;
+    buf->wlrBuffer = wlr_buffer_lock(wlrBuffer);
+    buf->bufferWidth = wlrBuffer->width;
+    buf->bufferHeight = wlrBuffer->height;
+    buf->bufferIsOpaque = false; // todo
+
+    buf->eventListeners.bufferRelease.notify = bufferReleaseEventBridge;
+    wl_signal_add(&wlrBuffer->events.release, &buf->eventListeners.bufferRelease);
+}
+
+
+static void bufferReleaseEventBridge(wl_listener* listener, void* data) {
+    SceneBufferNode* buf = wl_container_of(listener, buf, eventListeners.bufferRelease);
+    sceneBufferNodeSetBuffer(buf, nullptr);
+}
+
 
 SceneBufferNode* SceneBufferNode::create(
     SceneTreeNode* parent, wlr_buffer* wlrBuffer
@@ -425,12 +589,18 @@ int SceneBufferNode::init(
 
     opacity = 1;
 
-    this->setBuffer(wlrBuffer);
-
+    
+    sceneBufferNodeSetBuffer(this, wlrBuffer);
     this->update(nullptr);
 
     return 0;
 }
+
+
+bool SceneBufferNode::invisible() {
+    return wlrBuffer == nullptr && texture == nullptr;
+}
+
 
 void SceneBufferNode::destroy() {
     SceneNode* base = this;
@@ -445,7 +615,7 @@ void SceneBufferNode::destroy() {
             }
 
             wlr_texture_destroy(this->texture);
-            this->setBuffer(nullptr);
+            sceneBufferNodeSetBuffer(this, nullptr);
             pixman_region32_fini(&this->opaqueRegion);
         }
     });
@@ -542,37 +712,214 @@ void SceneBufferNode::updateNodeUpdateOutputs(
 }
 
 
-static void bufferReleaseEventBridge(wl_listener* listener, void* data) {
-    SceneBufferNode* buf = wl_container_of(listener, buf, eventListeners.bufferRelease);
-    buf->setBuffer(nullptr);
+// todo: 本函数在 Output.cpp 内重复定义。
+static void scaleOutputDamage(pixman_region32_t* damage, float scale) {
+    wlr_region_scale(damage, damage, scale);
+    if (floor(scale) != scale) {
+        wlr_region_expand(damage, damage, 1);
+    }
 }
 
 
-void SceneBufferNode::setBuffer(wlr_buffer* wlrBuffer) {
-    wl_list_remove(&eventListeners.bufferRelease.link);
-    wl_list_init(&eventListeners.bufferRelease.link);
-    if (ownBuffer) {
-        wlr_buffer_unlock(this->wlrBuffer);
+void SceneBufferNode::setBuffer(wlr_buffer* wlrBuffer, pixman_region32_t* damage) {
+    bool update = false;
+    wlr_texture_destroy(this->texture);
+    this->texture = nullptr;
+
+    if (wlrBuffer) {
+        update = dstHeight == 0 && dstWidth == 0 
+            && (bufferWidth != wlrBuffer->width || bufferHeight != wlrBuffer->height);
+    } else {
+        update = true;
     }
 
-    this->wlrBuffer = nullptr;
-    this->ownBuffer = false;
-    this->bufferWidth = this->bufferHeight = 0;
-    this->bufferIsOpaque = false;
+    sceneBufferNodeSetBuffer(this, wlrBuffer);
 
-    if (!wlrBuffer) {
+    if (update) {
+        this->update(nullptr);
+        return;    
+    }
+
+    int lx, ly;
+    if (!this->coords(&lx, &ly)) {
         return;
     }
 
-    this->ownBuffer = true;
-    this->wlrBuffer = wlr_buffer_lock(wlrBuffer);
-    this->bufferWidth = wlrBuffer->width;
-    this->bufferHeight = wlrBuffer->height;
-    this->bufferIsOpaque = false; // todo
+    pixman_region32_t fallbackDamage;
+    pixman_region32_init_rect(&fallbackDamage, 0, 0, wlrBuffer->width, wlrBuffer->height);
+    if (!damage) {
+        damage = &fallbackDamage;
+    }
 
-    this->eventListeners.bufferRelease.notify = bufferReleaseEventBridge;
-    wl_signal_add(&wlrBuffer->events.release, &eventListeners.bufferRelease);
+    wlr_fbox box = srcBox;
+    if (wlr_fbox_empty(&box)) {
+        box.x = box.y = 0;
+        box.width = wlrBuffer->width;
+        box.height = wlrBuffer->height;
+    }
+
+    wlr_fbox_transform(&box, &box, transform, wlrBuffer->width, wlrBuffer->height);
+
+    float scaleX, scaleY;
+    if (dstWidth || dstHeight) {
+        scaleX = dstWidth / box.width;
+        scaleY = dstHeight / box.height;
+    } else {
+        scaleX = wlrBuffer->width / box.width;
+        scaleY = wlrBuffer->height / box.height;
+    }
+
+    pixman::Region32 transDamage;
+    wlr_region_transform(
+        transDamage.raw(), damage, transform, wlrBuffer->width, wlrBuffer->height
+    );
+
+    transDamage.intersectRect(transDamage, box);
+    pixman_region32_translate(transDamage.raw(), -box.x, -box.y);
+
+    Scene* scene = this->getRootScene();
+    Output* sceneOutput;
+    wl_list_for_each(sceneOutput, &scene->outputs, link) {
+        float outputScale = sceneOutput->wlrOutput->scale;
+        float outputScaleX = outputScale * scaleX;
+        float outputScaleY = outputScale * scaleY;
+
+        pixman::Region32 outputDamage;
+        wlr_region_scale_xy(outputDamage.raw(), transDamage.raw(), outputScaleX, outputScaleY);
+
+        /*
+            输出的单个像素，实际对应 bufferScaleX * bufferScaleY 个像素。
+
+            要考虑 buffer 的 upscale 和 downscale
+        */
+        float bufferScaleX = 1.0f / outputScaleX;
+        float bufferScaleY = 1.0f / outputScaleY;
+        
+        int distX = 0;
+        if (floor(bufferScaleX) != bufferScaleX) {
+            distX = (int) ceilf(outputScaleX / 2.0f);
+        }
+
+        int distY = 0;
+        if (floor(bufferScaleY) != bufferScaleY) {
+            distY = (int) ceilf(outputScaleY / 20.f);
+        }
+
+        wlr_region_expand(
+            outputDamage.raw(), outputDamage.raw(), distX >= distY ? distX : distY
+        );
+
+        pixman::Region32 cullRegion;
+        pixman_region32_copy(cullRegion.raw(), &this->visibleArea);
+        scaleOutputDamage(cullRegion.raw(), outputScale);
+        pixman_region32_translate(cullRegion.raw(), -lx * outputScale, -ly * outputScale);
+        pixman_region32_intersect(outputDamage.raw(), outputDamage.raw(), cullRegion.raw());
+
+        pixman_region32_translate(
+            outputDamage.raw(),
+            (int) round((lx - sceneOutput->position.x) * outputScale),
+            (int) round((ly - sceneOutput->position.y) * outputScale)
+        );
+
+        if (wlr_damage_ring_add(&sceneOutput->wlrDamageRing, outputDamage.raw())) {
+            wlr_output_schedule_frame(sceneOutput->wlrOutput);
+        }
+    }
+
+    pixman_region32_fini(&fallbackDamage);
 }
+
+
+wlr_texture* SceneBufferNode::getTexture(wlr_renderer* wlrRenderer) {
+    if (wlrBuffer == nullptr || this->texture != nullptr) {
+        return this->texture;
+    }
+
+    wlr_client_buffer* clientBuffer = wlr_client_buffer_get(wlrBuffer);
+    if (clientBuffer) {
+        return clientBuffer->texture;
+    }
+
+    this->texture = wlr_texture_from_buffer(wlrRenderer, this->wlrBuffer);
+    if (this->texture && this->ownBuffer) {
+        this->ownBuffer = false;
+        wlr_buffer_unlock(this->wlrBuffer);
+    }
+
+    return this->texture;
+}
+
+
+void SceneBufferNode::unmarkClientBuffer() {
+    if (!this->wlrBuffer) {
+        return;
+    }
+
+    wlr_client_buffer* clientBuf = wlr_client_buffer_get(this->wlrBuffer);
+    if (!clientBuf) {
+        return;
+    }
+
+    // asserts that clientBuf->n_ignore_locks > 0
+
+    clientBuf->n_ignore_locks--; 
+}
+
+
+void SceneBufferNode::setOpaqueRegion(pixman_region32_t* opaque) {
+    if (pixman_region32_equal(&opaqueRegion, opaque)) {
+        return;
+    }
+
+    pixman_region32_copy(&this->opaqueRegion, opaque);
+
+    int x, y;
+    if (!this->coords(&x, &y)) {
+        return;
+    }
+
+    pixman::Region32 updateRegion;
+    bounds(x, y, updateRegion.raw());
+    this->getRootScene()->updateRegion(updateRegion.raw());
+}
+
+
+void SceneBufferNode::setSourceBox(wlr_fbox* srcBox) {
+    if (wlr_fbox_equal(&this->srcBox, srcBox)) {
+        return;
+    }
+
+    if (srcBox != nullptr) {
+        this->srcBox = *srcBox;
+    } else {
+        this->srcBox.x = this->srcBox.y = this->srcBox.width = this->srcBox.height = 0;
+    }
+
+    this->update(nullptr);
+}
+
+
+void SceneBufferNode::setDstSize(int width, int height) {
+    if (this->dstHeight == height && this->dstWidth == width) {
+        return;
+    }
+
+    this->dstWidth = width;
+    this->dstHeight = height;
+    this->update(nullptr);
+}
+
+
+void SceneBufferNode::setTransform(wl_output_transform transform) {
+    if (this->transform == transform) {
+        return;
+    }
+
+    this->transform = transform;
+    this->update(nullptr);
+}
+
+
 
 /* ------------ SceneBufferNode 结束 ------------ */
 
@@ -614,6 +961,10 @@ int SceneRectNode::init(
 void SceneRectNode::destroy() {
     SceneNode* base = this;
     base->destroy([] (Scene*) {});
+}
+
+bool SceneRectNode::invisible() {
+    return color[3] == 0.f;
 }
 
 /* ------------ SceneRectNode 结束 ------------ */

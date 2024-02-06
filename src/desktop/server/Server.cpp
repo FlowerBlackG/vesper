@@ -14,10 +14,13 @@
 #include "./View.h"
 #include "../scene/Scene.h"
 #include "../scene/SceneNode.h"
+#include "../scene/XdgShell.h"
+#include "../scene/Surface.h"
 
 #include <unistd.h>
-using namespace std;
 
+using namespace std;
+using namespace vesper::desktop;
 
 namespace vesper::desktop::server {
 
@@ -69,8 +72,16 @@ static void newXdgPopupEventBridge(wl_listener* listener, void* data) {
         return;
     }
 
-    auto* parentTree = (wlr_scene_tree*) parent->data;
-    xdgPopup->base->data = wlr_scene_xdg_surface_create(parentTree, xdgPopup->base);
+    auto* parentTree = (scene::SceneTreeNode*) parent->data;
+
+    auto* sceneXdgSurface = scene::XdgSurface::create(parentTree, xdgPopup->base);
+    
+    if (sceneXdgSurface == nullptr) {
+        LOG_ERROR("failed to create xdg surface!");
+        return;
+    }
+
+    xdgPopup->base->data = sceneXdgSurface->tree;
 }
 
 /**
@@ -248,7 +259,7 @@ int Server::run() {
         return -1;
     }
 
-    this->wlrRenderer = wlr_renderer_autocreate(wlrBackend);
+    this->wlrRenderer = wlr_pixman_renderer_create();
     if (!wlrRenderer) {
         LOG_ERROR("failed to create wlroots renderer!");
         return -1;
@@ -347,7 +358,7 @@ int Server::run() {
 
     setenv("WAYLAND_DISPLAY", socket, true); 
     if (fork() == 0) {
-        execl("/bin/sh", "/bin/sh", "-c", "konsole", nullptr);
+        execl("/bin/sh", "/bin/sh", "-c", "kgx", nullptr);
     }
 
     LOG_INFO("server running...");
@@ -485,27 +496,27 @@ View* Server::desktopViewAt(
     double lx, double ly, wlr_surface** surface, 
     double* sx, double* sy
 ) {
-    auto* node = wlr_scene_node_at(&wlrScene->tree.node, lx, ly, sx, sy);
+    auto* node = scene->tree->nodeAt(lx, ly, sx, sy);
 
-    if (node == nullptr || node->type != WLR_SCENE_NODE_BUFFER) {
+    if (node == nullptr || node->type() != scene::SceneNodeType::BUFFER) {
         return nullptr;
     }
 
-    auto* sceneBuf = wlr_scene_buffer_from_node(node);
-    auto* sceneSurface = wlr_scene_surface_try_from_buffer(sceneBuf);
+    auto* sceneBuf = (scene::SceneBufferNode*) node;
+    auto* sceneSurface = scene::Surface::tryFindSurfaceFromBuffer(sceneBuf);
 
     if (!sceneBuf) {
         return nullptr;
     }
 
-    *surface = sceneSurface->surface;
+    *surface = sceneSurface->wlrSurface;
 
     auto* tree = node->parent;
-    while (tree && tree->node.data == nullptr) {
-        tree = tree->node.parent;
+    while (tree && tree->data == nullptr) {
+        tree = tree->parent;
     }
 
-    return (View*) tree->node.data;
+    return (View*) tree->data;
 }
 
 

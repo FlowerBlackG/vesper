@@ -67,8 +67,20 @@ public:
 
     void opaqueRegion(int x, int y, pixman_region32_t* opaque);
 
+    virtual bool invisible() = 0;
+
+    void sendFrameDone(Output* sceneOutput, timespec* now);
+
+    void placeAbove(SceneNode* sibling);
+    void placeBelow(SceneNode* sibling);
+
+    void raiseToTop();
+    void lowerToBottom();
+
+    SceneNode* nodeAt(double lx, double ly, double* nx, double* ny);
+
 public:
-    SceneNode* parent = nullptr;
+    SceneTreeNode* parent = nullptr;
 
     /**
      * 用于挂在父母节点的 children 列表里。
@@ -84,11 +96,13 @@ public:
     
     struct {
         wl_signal destroy;
-    } events;
+    } basicEvents;
 
     pixman_region32_t visibleArea;
 
-    void* data;
+    void* data = nullptr;
+
+    wlr_addon_set addons;
 
 public:
     void destroy(std::function<void(Scene*)> typeDestroy);
@@ -107,11 +121,18 @@ public:
     void destroy();
     int init(SceneTreeNode* parent);
 
+    virtual inline bool invisible() override { return true; };
+
 public:
     /**
      * 所有孩子节点。children 列表挂的是子节点的 link 成员。
      */
     wl_list children;
+
+    /**
+     * 只有当当前节点是跟节点时，才允许该指针指向 Scene。
+     */
+    Scene* rootScene = nullptr;
 };
 
 /**
@@ -129,9 +150,20 @@ public:
         SceneTreeNode* parent, wlr_buffer* wlrBuffer
     );
 
+    virtual inline bool invisible() override;
+
 public:
     void updateNodeUpdateOutputs(wl_list* outputs, Output* ignore, Output* force);
-    void setBuffer(wlr_buffer* wlrBuffer);
+    void setBuffer(wlr_buffer* wlrBuffer, pixman_region32_t* damage = nullptr);
+    wlr_texture* getTexture(wlr_renderer* wlrRenderer);
+
+    void unmarkClientBuffer();
+
+    void setOpaqueRegion(pixman_region32_t* opaque);
+    void setSourceBox(wlr_fbox* srcBox);
+    void setDstSize(int width, int height);
+    void setTransform(wl_output_transform transform);
+
 
 public:
     wlr_buffer* wlrBuffer = nullptr;
@@ -146,19 +178,21 @@ public:
 
     // todo: wlr_scene_buffer_point_accepts_input_func_t point_accepts_input;
 
-    Output* primaryOutput;
+    Output* primaryOutput = nullptr;
 
-    float opacity;
+    float opacity = 0;
 
     wlr_fbox srcBox;
-    int dstWidth, dstHeight;
+    int dstWidth = 0, dstHeight = 0;
+
+    wl_output_transform transform;
 
     pixman_region32_t opaqueRegion;
-    uint64_t activeOutputs;
-    wlr_texture* texture;
+    uint64_t activeOutputs = 0;
+    wlr_texture* texture = nullptr;
     
     bool ownBuffer;
-    int bufferWidth, bufferHeight;
+    int bufferWidth = 0, bufferHeight = 0;
     bool bufferIsOpaque;
     
     struct {
@@ -182,9 +216,11 @@ public:
         SceneTreeNode* parent, int width, int height, const float color[4]
     );
 
+    virtual inline bool invisible() override;
+
 public:
-    int width;
-    int height;
+    int width = 0;
+    int height = 0;
 
     /**
      * 

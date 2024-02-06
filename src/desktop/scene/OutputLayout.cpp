@@ -11,6 +11,8 @@
 #include "./SceneNode.h"
 #include "./Scene.h"
 
+#include "../../log/Log.h"
+
 using namespace std;
 
 namespace vesper::desktop::scene {
@@ -54,7 +56,7 @@ int OutputLayout::init(Scene* scene, wlr_output_layout* wlrOutputLayout) {
     wl_signal_add(&wlrOutputLayout->events.change, &eventListeners.layoutChange);
     
     eventListeners.sceneDestroy.notify = outputLayoutSceneDestroyEventBridge;
-    wl_signal_add(&scene->tree->events.destroy, &eventListeners.sceneDestroy);
+    wl_signal_add(&scene->tree->basicEvents.destroy, &eventListeners.sceneDestroy);
 
     return 0;
 
@@ -73,10 +75,88 @@ void OutputLayout::destroy() {
 }
 
 
+int OutputLayout::addOutput(
+    wlr_output_layout_output* wlrLayoutOutput, Output* sceneOutput
+) {
+    OutputLayoutOutput* olo;
+    wl_list_for_each(olo, &this->outputs, link) {
+        if (olo->sceneOutput == sceneOutput) {
+            LOG_ERROR("bad output!");
+            return -1;
+        }
+    }
+
+    olo = OutputLayoutOutput::create(sceneOutput, wlrLayoutOutput, this);
+    if (!olo) {
+        LOG_ERROR("failed to create scene output layout output!");
+        return -1;
+    }
+
+    return 0;
+}
+
+
 /* ------------ OutputLayout 结束 ------------ */
 
 
 /* ------------ OutputLayoutOutput 开始 ------------ */
+
+
+static void layoutOutputDestroyEventBridge(wl_listener* listener, void* data) {
+    OutputLayoutOutput* olo = wl_container_of(
+        listener, olo, eventListeners.layoutOutputDestroy
+    );
+
+    olo->destroy();
+    delete olo;
+}
+
+
+static void sceneOutputDestroyEventBridge(wl_listener* listener, void* data) {
+    OutputLayoutOutput* olo = wl_container_of(
+        listener, olo, eventListeners.sceneOutputDestroy
+    );
+
+    olo->destroy();
+    delete olo;
+}
+
+
+OutputLayoutOutput* OutputLayoutOutput::create(
+    Output* sceneOutput, wlr_output_layout_output* wlrLayoutOutput, OutputLayout* outputLayout
+) {
+    auto* p = new (nothrow) OutputLayoutOutput;
+    if (!p) {
+        return nullptr;
+    }
+
+    if (p->init(sceneOutput, wlrLayoutOutput, outputLayout)) {
+        delete p;
+        return nullptr;
+    }
+
+    return p;
+}
+
+int OutputLayoutOutput::init(
+    Output* sceneOutput, wlr_output_layout_output* wlrLayoutOutput, OutputLayout* outputLayout
+) {
+    this->sceneOutput = sceneOutput;
+    this->wlrLayoutOutput = wlrLayoutOutput;
+
+    this->eventListeners.layoutOutputDestroy.notify = layoutOutputDestroyEventBridge;
+    wl_signal_add(&wlrLayoutOutput->events.destroy, &eventListeners.layoutOutputDestroy);
+
+    this->eventListeners.sceneOutputDestroy.notify = sceneOutputDestroyEventBridge;
+    wl_signal_add(&sceneOutput->events.destroy, &eventListeners.sceneOutputDestroy);
+    
+    wl_list_insert(&outputLayout->outputs, &this->link);
+
+    sceneOutput->setPosition(wlrLayoutOutput->x, wlrLayoutOutput->y);
+
+    return 0;
+}
+    
 
 void OutputLayoutOutput::destroy() {
     wl_list_remove(&eventListeners.layoutOutputDestroy.link);

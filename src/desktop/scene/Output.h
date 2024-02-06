@@ -13,12 +13,30 @@
 namespace vesper::desktop::scene {
 
 class Scene;
+class RenderTimer;
+
 
 class Output {
 
 public:
+
+    static Output* create(Scene* scene, wlr_output* wlrOutput);
+    int init(Scene* scene, wlr_output* wlrOutput);
+
     void setPosition(int x, int y);
     void updateGeometry(bool forceUpdate);
+
+
+    struct StateOptions {
+        RenderTimer* timer;
+    };
+
+
+    bool commit(StateOptions* options);
+
+    bool buildState(wlr_output_state* state, StateOptions* options);
+
+    void sendFrameDone(timespec* now);
 
 public:
     void destroy();
@@ -32,6 +50,11 @@ public:
     wl_list link;
 
     Scene* scene;
+
+    /**
+     * 用于挂到 wlr_output 上。
+     */
+    wlr_addon addon;
 
     wlr_damage_ring wlrDamageRing;
 
@@ -58,6 +81,16 @@ public:
     wl_array renderList;
 
 }; // class Output
+
+
+extern wlr_addon_interface sceneOutputAddonImpl;
+
+
+struct OutputSampleEvent {
+    Output* output;    
+};
+
+
 
 } // namespace vesper::desktop::scene
 

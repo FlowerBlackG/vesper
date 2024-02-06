@@ -11,7 +11,10 @@
 #include "./Server.h"
 #include "../scene/SceneNode.h"
 #include "../scene/Scene.h"
+#include "../scene/XdgShell.h"
+
 using namespace std;
+using namespace vesper::desktop;
 
 namespace vesper::desktop::server {
 
@@ -125,25 +128,30 @@ int View::init(Server* server, wlr_xdg_toplevel* xdgToplevel) {
     this->server = server;
     this->wlrXdgToplevel = xdgToplevel;
 
-    wlrSceneTree = wlr_scene_xdg_surface_create(
-        &this->server->wlrScene->tree, xdgToplevel->base
-    );
 
-    wlrSceneTree->node.data = this;
-    xdgToplevel->base->data = this->wlrSceneTree;
+    auto* xdgSurface = scene::XdgSurface::create(server->scene->tree, xdgToplevel->base);
+    if (xdgSurface == nullptr) {
+        LOG_ERROR("failed to create xdg surface!");
+        return -1;
+    }
 
-    auto* xdgSurface = xdgToplevel->base;
+    this->sceneTree = xdgSurface->tree;
+
+    this->sceneTree->data = this;
+    xdgToplevel->base->data = this->sceneTree;
+
+    auto* wlrXdgSurface = xdgToplevel->base;
 
     eventListeners.map.notify = xdgToplevelMapEventBridge;
-    wl_signal_add(&xdgSurface->surface->events.map, &eventListeners.map);
+    wl_signal_add(&wlrXdgSurface->surface->events.map, &eventListeners.map);
 
     eventListeners.unmap.notify = xdgToplevelUnmapEventBridge;
-    wl_signal_add(&xdgSurface->surface->events.unmap, &eventListeners.unmap);
+    wl_signal_add(&wlrXdgSurface->surface->events.unmap, &eventListeners.unmap);
 
     eventListeners.destroy.notify = xdgToplevelDestroyEventBridge;
-    wl_signal_add(&xdgSurface->surface->events.destroy, &eventListeners.destroy);
+    wl_signal_add(&wlrXdgSurface->surface->events.destroy, &eventListeners.destroy);
 
-    auto* topLevel = xdgSurface->toplevel;
+    auto* topLevel = wlrXdgSurface->toplevel;
 
     eventListeners.requestMove.notify = xdgToplevelRequestMoveEventBridge;
     wl_signal_add(&topLevel->events.request_move, &eventListeners.requestMove);
@@ -177,7 +185,7 @@ void View::focus(wlr_surface* surface) {
 
     auto* keyboard = wlr_seat_get_keyboard(seat);
 
-    wlr_scene_node_raise_to_top(&wlrSceneTree->node);
+    this->sceneTree->raiseToTop();
 
     wlr_xdg_toplevel_set_activated(this->wlrXdgToplevel, true);
 

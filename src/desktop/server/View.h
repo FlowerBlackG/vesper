@@ -39,7 +39,6 @@ public:
     wlr_xdg_toplevel* wlrXdgToplevel;
 
     vesper::desktop::scene::SceneTreeNode* sceneTree;
-    // todo: delete this line! //wlr_scene_tree* wlrSceneTree;
 
 
     struct {

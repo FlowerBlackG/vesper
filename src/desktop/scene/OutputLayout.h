@@ -21,6 +21,8 @@ public:
     int init(Scene* scene, wlr_output_layout* wlrOutputLayout);
     void destroy();
 
+    int addOutput(wlr_output_layout_output* wlrLayoutOutput, Output* sceneOutput);
+
 
 public:
     wlr_output_layout* wlrLayout;
@@ -42,6 +44,16 @@ public:
 class OutputLayoutOutput {
 
 public:
+    static OutputLayoutOutput* create(
+        Output* sceneOutput, 
+        wlr_output_layout_output* wlrLayoutOutput, 
+        OutputLayout* outputLayout
+    );
+    int init(
+        Output* sceneOutput, 
+        wlr_output_layout_output* wlrLayoutOutput, 
+        OutputLayout* outputLayout
+    );
     void destroy();
 
 public:

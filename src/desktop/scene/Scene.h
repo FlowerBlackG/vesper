@@ -26,6 +26,7 @@ public:
      * @return nullptr if failed. 
      */
     static Scene* create();
+    
 
 public:
     int init();
@@ -36,6 +37,8 @@ public:
 
     void updateRegion(pixman_region32_t* updateRegion);
     void damageOutputs(pixman_region32_t* damage);
+
+    Output* getSceneOutput(wlr_output* output);
 
 
 public:

@@ -37,6 +37,10 @@ public:
     );
 
     bool intersectRect(
+        Region32& source, wlr_fbox& box
+    );
+
+    bool intersectRect(
         pixman_region32_t* source, wlr_box& box
     );
 

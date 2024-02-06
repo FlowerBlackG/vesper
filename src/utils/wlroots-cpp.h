@@ -33,11 +33,17 @@ extern "C" {
     #include <wlr/types/wlr_damage_ring.h>
     #include <wlr/types/wlr_xdg_shell.h>
     #include <wlr/types/wlr_buffer.h>
+    #include <wlr/types/wlr_presentation_time.h>
+
+    #include <wlr/types/wlr_fractional_scale_v1.h>
 
     #include <wlr/backend.h>
     #include <wlr/render/wlr_renderer.h>
     #include <wlr/render/allocator.h>
+    #include <wlr/render/swapchain.h>
 
+    #include <wlr/util/transform.h>
+    #include <wlr/util/region.h>
     #include <wlr/util/log.h>
 
     #include <wlr/backend/headless.h>
