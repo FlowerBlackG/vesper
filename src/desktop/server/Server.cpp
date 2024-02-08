@@ -13,6 +13,7 @@
 #include "../../log/Log.h"
 #include "./View.h"
 #include "../scene/Scene.h"
+#include "../scene/Output.h"
 #include "../scene/SceneNode.h"
 #include "../scene/XdgShell.h"
 #include "../scene/Surface.h"
@@ -41,8 +42,9 @@ static void newXdgToplevelEventBridge(wl_listener* listener, void* data) {
     Server* server = wl_container_of(listener, server, eventListeners.newXdgToplevel);
 
     auto* toplevel = (wlr_xdg_toplevel*) data;
-LOG_TEMPORARY("toplevel: ", toplevel->base);
+
     View* view = new (nothrow) View;
+LOG_TEMPORARY("view at: ", view);
     if (!view) {
         LOG_ERROR("failed to allocate View object!");
         return;
@@ -297,6 +299,7 @@ int Server::run() {
     }
 
     // xdg shell
+    
     wl_list_init(&views);
     wlrXdgShell = wlr_xdg_shell_create(wlDisplay, 3);
     eventListeners.newXdgToplevel.notify = newXdgToplevelEventBridge;
@@ -305,6 +308,7 @@ int Server::run() {
     wl_signal_add(&wlrXdgShell->events.new_popup, &eventListeners.newXdgPopup);
 
     // wlroots cursor 
+
     wlrCursor = wlr_cursor_create();
     wlr_cursor_attach_output_layout(wlrCursor, wlrOutputLayout);
 
@@ -315,6 +319,7 @@ int Server::run() {
     wlrXCursorMgr = wlr_xcursor_manager_create(nullptr, 24);
 
     // cursor
+
     cursorMode = CursorMode::PASSTHROUGH;
     eventListeners.cursorMotion.notify = cursorMotionEventBridge;
     wl_signal_add(&wlrCursor->events.motion, &eventListeners.cursorMotion);
@@ -328,6 +333,7 @@ int Server::run() {
     wl_signal_add(&wlrCursor->events.frame, &eventListeners.cursorFrame);
 
     // wayland seat
+
     wl_list_init(&wlKeyboards);
     eventListeners.newInput.notify = newInputEventBridge;
     wl_signal_add(&wlrBackend->events.new_input, &eventListeners.newInput);
@@ -358,7 +364,7 @@ int Server::run() {
 
     setenv("WAYLAND_DISPLAY", socket, true); 
     if (fork() == 0) {
-        execl("/bin/sh", "/bin/sh", "-c", "kgx", nullptr);
+        execl("/bin/sh", "/bin/sh", "-c", "konsole", nullptr);
     }
 
     LOG_INFO("server running...");
@@ -411,7 +417,11 @@ void Server::newOutputEventHandler(wlr_output* newOutput) {
 }
 
 void Server::processCursorMotion(uint32_t timeMsec) {
-
+    
+    // todo
+//    Output* p = wl_container_of(this->wlOutputs.next, p, link);
+//    wlr_output_schedule_frame(p->wlrOutput);
+    
     if (cursorMode == CursorMode::MOVE) {
         processCursorMove(timeMsec);
         return;

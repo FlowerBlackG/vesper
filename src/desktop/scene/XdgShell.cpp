@@ -36,9 +36,9 @@ static void xdgSurfaceDestroyEventBridge(wl_listener* listener, void* data) {
         listener, sceneXdgSurface, eventListeners.xdgSurfaceDestroy
     );
 
-    sceneXdgSurface->tree->destroy();
-    delete sceneXdgSurface->tree;
-    sceneXdgSurface->tree = nullptr;
+    auto* tree = sceneXdgSurface->tree;
+    tree->destroy();
+    delete tree;
 }
 
 

@@ -18,25 +18,28 @@ help:
 
 .PHONY: prepare
 prepare:
-	cd ../ && mkdir -p build && cd build \
+	mkdir -p build && cd build \
 	&& cmake -G"Unix Makefiles" ../src
 
 
 .PHONY: build
 build: prepare
-	cd ../build && cmake --build . -- -j 8
-	cd ../ && mkdir -p target && cp build/vesper target/
+	cd build && cmake --build . -- -j 8
+	mkdir -p target && cp build/vesper target/
+	cd target && mkdir -p asm-dump \
+	&& objdump -d ./vesper > asm-dump/vesper.text.asm \
+	&& objdump -D ./vesper > asm-dump/vesper.full.asm 
 
 
 .PHONY: clean
 clean:
-	rm -rf ../build
-	rm -rf ../target
+	rm -rf ./build
+	rm -rf ./target
 
 
 .PHONY: run
 run: build
-	cd ../target && ./vesper
+	cd target && ./vesper
 
 
 .PHONY: all

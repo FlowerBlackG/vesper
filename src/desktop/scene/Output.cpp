@@ -15,7 +15,7 @@
 #include "../../log/Log.h"
 
 #include "../../bindings/pixman/Region32.h"
-
+#include <jpeglib.h>
 using namespace std;
 using namespace vesper::bindings;
 
@@ -218,6 +218,7 @@ struct RenderListConstructorData {
 
 struct RenderListEntry {
     SceneNode* node;
+    bool sentDmaBufFeedback;
     int x, y;
 };
 
@@ -412,6 +413,9 @@ static void sceneEntryRender(RenderListEntry& entry, const RenderData& data) {
 
 
 bool Output::buildState(wlr_output_state* state, StateOptions* options) {
+
+    this->updateGeometry(true); // todo
+
     StateOptions defaultOptions = {
         .timer = nullptr
     };
@@ -574,13 +578,18 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
         
         if (entry.node->type() == SceneNodeType::BUFFER) {
             auto* buf = (SceneBufferNode*) entry.node;
-            if (buf->primaryOutput == this) {
-                // todo or ignored: send dmabuf feedback
+            if (buf->primaryOutput == this && !entry.sentDmaBufFeedback) {
+                wlr_linux_dmabuf_feedback_v1_init_options feedbackOptions = {
+                    .main_renderer = wlrOutput->renderer,
+                    .scanout_primary_output = nullptr
+                };
+
+                this->scene->sceneBufferSendDmaBufFeedback(buf, &feedbackOptions);
             }
         }
     }
 
-    wlr_output_add_software_cursors_to_render_pass(wlrOutput, renderPass, &renderData.damage);
+    //wlr_output_add_software_cursors_to_render_pass(wlrOutput, renderPass, &renderData.damage);
 
     pixman_region32_fini(&renderData.damage);
 
@@ -589,6 +598,50 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
         wlr_damage_ring_add_whole(&wlrDamageRing);
         return false;
     }
+
+    
+
+
+
+
+#if 0
+wlr_renderer* pixmanRenderer = wlrOutput->renderer;
+pixman_image_t* img = wlr_pixman_renderer_get_buffer_image(pixmanRenderer, buffer);
+int width = pixman_image_get_width(img);
+int height = pixman_image_get_height(img);
+int stride = pixman_image_get_stride(img);
+int depth = pixman_image_get_depth(img);
+pixman_format_code_t fmt = pixman_image_get_format(img);
+uint32_t* imgData = pixman_image_get_data(img);
+
+static int __photoId = -1;
+__photoId++;
+string fname = std::to_string(__photoId);
+fname += ".jpg";
+fname = "./" + fname;
+FILE* outfile = fopen(fname.c_str(), "wb");
+jpeg_compress_struct cinfo;
+jpeg_error_mgr jerr;
+cinfo.err = jpeg_std_error(&jerr);
+jpeg_create_compress(&cinfo);
+jpeg_stdio_dest(&cinfo, outfile);
+cinfo.image_width = width;
+cinfo.image_height = height;
+cinfo.in_color_space = JCS_EXT_BGRX;
+cinfo.input_components = 4;
+jpeg_set_defaults(&cinfo);
+jpeg_start_compress(&cinfo, TRUE);
+int i = 0;
+while (cinfo.next_scanline < cinfo.image_height) {
+    unsigned char* linePtr = (unsigned char*) imgData;
+    linePtr += i * cinfo.image_width * cinfo.input_components;
+    jpeg_write_scanlines(&cinfo, &linePtr, 1);
+    i++;
+}
+jpeg_finish_compress(&cinfo);
+jpeg_destroy_compress(&cinfo);
+#endif
+
 
     wlr_output_state_set_buffer(state, buffer);
     wlr_buffer_unlock(buffer);

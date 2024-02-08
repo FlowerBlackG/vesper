@@ -67,6 +67,9 @@ find_package(LibVNCServer REQUIRED)
 
 find_package(WaylandProtocols REQUIRED)
 
+find_package(JPEG REQUIRED)
+
+
 #[[
     关联依赖库
 ]]
@@ -78,6 +81,9 @@ include_directories(
     ${PIXMAN_INCLUDE_DIRS}
 
     ${WAYLAND_PROTOCOLS_GEN_DIR}
+
+
+    ${JPEG_INCLUDE_DIRS}
 )
 
 
@@ -89,6 +95,8 @@ target_link_libraries(
     ${XKB_LIBRARIES} 
     ${PIXMAN_LIBRARIES}
     LibVNCServer::vncserver
+
+    ${JPEG_LIBRARIES}
 )
 
 

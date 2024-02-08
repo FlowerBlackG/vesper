@@ -126,6 +126,11 @@ public:
 public:
     /**
      * 所有孩子节点。children 列表挂的是子节点的 link 成员。
+     * 从头向后遍历，越靠后的节点在屏幕上的位置越靠上。
+     * 
+     * 例如，children 如下时：
+     *   children -> 1 -> 2 -> 3 -> 循环
+     * 节点 3 是在最上层的。节点 1 的内容可能被 2 和 3 遮挡。
      */
     wl_list children;
 
@@ -190,6 +195,8 @@ public:
     pixman_region32_t opaqueRegion;
     uint64_t activeOutputs = 0;
     wlr_texture* texture = nullptr;
+
+    wlr_linux_dmabuf_feedback_v1_init_options dmaBufPrevFeedbackOptions;
     
     bool ownBuffer;
     int bufferWidth = 0, bufferHeight = 0;

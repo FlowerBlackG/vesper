@@ -23,7 +23,7 @@ namespace vesper::desktop::server {
  */
 static void xdgToplevelMapEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.map);
-    
+    LOG_TEMPORARY("xdg toplevel map: ", view);
     wl_list_insert(&view->server->views, &view->link);
 
     LOG_INFO("new xdg toplevel mapped.");
@@ -136,7 +136,7 @@ int View::init(Server* server, wlr_xdg_toplevel* xdgToplevel) {
     }
 
     this->sceneTree = xdgSurface->tree;
-
+LOG_TEMPORARY("sceneTree at: ", this->sceneTree);
     this->sceneTree->data = this;
     xdgToplevel->base->data = this->sceneTree;
 

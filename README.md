@@ -10,42 +10,6 @@
 
 ![img](./doc/images/vesper-overview.drawio.svg)
 
-## 项目进展
-
-**desktop - server**
-
-* [ ] ?
-
----
-
-**desktop - scene**
-
-* [X] wlr_scene_create
-* [X] wlr_scene_attach_output_layout
-* [ ] wlr_scene_xdg_surface_create
-* [ ] wlr_scene_output_create
-* [ ] wlr_scene_output_layout_add_output
-* [ ] wlr_scene_output_commit
-* [ ] wlr_scene_get_scene_output
-* [ ] wlr_scene_node_set_position
-* [ ] wlr_scene_output_send_frame_done
-* [ ] wlr_scene_node_destroy
-* [ ] wlr_scene_surface_try_from_buffer
-* [ ] wlr_scene_node_raise_to_top
-* [ ] wlr_scene_buffer_from_node
-
----
-
-**vnc**
-
-* [ ] ?
-
----
-
-**control**
-
-* [ ] ?
-
 ## 参考
 
 * \[1\] Drew DeVault. The Wayland Protocol. [https://wayland-book.com/](https://wayland-book.com/)

@@ -13,6 +13,7 @@
 namespace vesper::desktop::scene {
 
 class SceneTreeNode;
+class SceneBufferNode;
 class Output;
 class OutputLayout;
 
@@ -40,6 +41,12 @@ public:
 
     Output* getSceneOutput(wlr_output* output);
 
+    void setLinuxDmaBufV1(wlr_linux_dmabuf_v1* linuxDmaBufV1);
+    void sceneBufferSendDmaBufFeedback(
+        SceneBufferNode* sceneBuffer,
+        wlr_linux_dmabuf_feedback_v1_init_options* options
+    );
+
 
 public:
     SceneTreeNode* tree = nullptr;
@@ -50,6 +57,16 @@ public:
     wl_list outputs;
 
     bool calculateVisibility;
+
+    /**
+     * 
+     * nullable
+     */
+    wlr_linux_dmabuf_v1* linuxDmaBufV1 = nullptr;
+
+    struct {
+        wl_listener linuxDmaBufV1Destroy;
+    } eventListeners;
 
 };
 

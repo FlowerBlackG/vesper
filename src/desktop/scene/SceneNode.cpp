@@ -259,7 +259,7 @@ static inline bool nodesInBoxRecursion(
     if (node->type() == SceneNodeType::TREE) {
         auto* tree = (SceneTreeNode*) node;
         SceneNode* child;
-        wl_list_for_each(child, &tree->children, link) {
+        wl_list_for_each_reverse(child, &tree->children, link) {
             bool inBox = nodesInBoxRecursion(
                 child, box, onDiscover, data, 
                 child->offset.x + x, child->offset.y + y
@@ -448,7 +448,15 @@ SceneNode* SceneNode::nodeAt(double lx, double ly, double* nx, double* ny) {
     };
 
     if (this->nodesInBox(&box, sceneNodeAtOnDiscover, &data)) {
+        if (nx) {
+            *nx = data.rx;
+        }
 
+        if (ny) {
+            *ny = data.ry;
+        }
+
+        return data.node;
     }
 
     return nullptr;
@@ -492,6 +500,8 @@ void SceneTreeNode::destroy() {
                 output->destroy();
                 delete output;
             }
+
+            wl_list_remove(&scene->eventListeners.linuxDmaBufV1Destroy.link);
         }
 
         SceneNode *child, *tmp;
@@ -666,7 +676,11 @@ void SceneBufferNode::updateNodeUpdateOutputs(
     }
 
     if (oldPrimaryOutput != primaryOutput) {
-        // todo: linux dmabuf feedback init options
+        this->dmaBufPrevFeedbackOptions = {
+            .main_renderer = nullptr,
+            .scanout_primary_output = nullptr,
+            .output_layer_feedback_event = nullptr,
+        };
     }
 
     uint64_t oldActive = this->activeOutputs;

@@ -364,6 +364,14 @@ SubSurfaceTree* SubSurfaceTree::create(SceneTreeNode* parent, wlr_surface* wlrSu
 
 
 int SubSurfaceTree::init(SceneTreeNode* parent, wlr_surface* wlrSurface) {
+
+    this->clip = {
+        .x = 0,
+        .y = 0,
+        .width = 0,
+        .height = 0,
+    };
+
     this->tree = SceneTreeNode::create(parent);
     if (this->tree == nullptr) {
         return -1;
@@ -420,6 +428,7 @@ int SubSurfaceTree::init(SceneTreeNode* parent, wlr_surface* wlrSurface) {
 
     this->eventListeners.surfaceNewSubSurface.notify = 
         subSurfaceTreeSurfaceNewSubSurfaceEventBridge;
+
     wl_signal_add(&wlrSurface->events.new_subsurface, &eventListeners.surfaceNewSubSurface);
 
 

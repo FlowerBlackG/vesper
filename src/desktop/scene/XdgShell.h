@@ -24,10 +24,10 @@ public:
     void updatePosition();
 
 public:
-    SceneTreeNode* tree;
-    SceneTreeNode* surfaceTree;
+    SceneTreeNode* tree = nullptr;
+    SceneTreeNode* surfaceTree = nullptr;
 
-    wlr_xdg_surface* wlrXdgSurface;
+    wlr_xdg_surface* wlrXdgSurface = nullptr;
 
     struct {
         wl_listener treeDestroy;

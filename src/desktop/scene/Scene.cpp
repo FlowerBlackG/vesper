@@ -11,6 +11,7 @@
 #include "./SceneNode.h"
 #include "./OutputLayout.h"
 #include "./Output.h"
+#include "./Surface.h"
 #include "../../bindings/pixman/Region32.h"
 
 #include <functional>
@@ -19,6 +20,15 @@ using namespace std;
 using namespace vesper::bindings;
 
 namespace vesper::desktop::scene {
+
+
+static void linuxDmaBufV1DestroyEventBridge(wl_listener* listener, void* data) {
+    Scene* scene = wl_container_of(listener, scene, eventListeners.linuxDmaBufV1Destroy);
+    wl_list_remove(&scene->eventListeners.linuxDmaBufV1Destroy.link);
+    wl_list_init(&scene->eventListeners.linuxDmaBufV1Destroy.link);
+    scene->linuxDmaBufV1 = nullptr;
+}
+
 
 Scene* Scene::create() {
     Scene* scene = new (nothrow) Scene;
@@ -45,6 +55,7 @@ int Scene::init() {
     tree->rootScene = this;
 
     wl_list_init(&outputs);
+    wl_list_init(&eventListeners.linuxDmaBufV1Destroy.link);
 
     return 0;
 }
@@ -173,6 +184,48 @@ Output* Scene::getSceneOutput(wlr_output* output) {
 
     Output* sceneOutput = wl_container_of(addon, sceneOutput, addon);
     return sceneOutput;
+}
+
+
+void Scene::setLinuxDmaBufV1(wlr_linux_dmabuf_v1* linuxDmaBufV1) {
+    if (this->linuxDmaBufV1 != nullptr) {
+        LOG_ERROR("scene's current dmabuf is NOT nullptr!");
+        return;
+    }
+
+    this->linuxDmaBufV1 = linuxDmaBufV1;
+    eventListeners.linuxDmaBufV1Destroy.notify = linuxDmaBufV1DestroyEventBridge;
+    wl_signal_add(&linuxDmaBufV1->events.destroy, &eventListeners.linuxDmaBufV1Destroy);
+}
+
+
+void Scene::sceneBufferSendDmaBufFeedback(
+    SceneBufferNode* sceneBuffer,
+    wlr_linux_dmabuf_feedback_v1_init_options* options
+) {
+    if (this->linuxDmaBufV1 == nullptr) {
+        return;
+    }
+
+    Surface* surface = Surface::tryFindSurfaceFromBuffer(sceneBuffer);
+    if (!surface) {
+        return;
+    }
+
+    if (memcmp(options, &sceneBuffer->dmaBufPrevFeedbackOptions, sizeof(*options)) == 0) {
+        return;
+    }
+
+    sceneBuffer->dmaBufPrevFeedbackOptions = *options;
+
+    wlr_linux_dmabuf_feedback_v1 feedback;
+    if (!wlr_linux_dmabuf_feedback_v1_init_with_options(&feedback, options)) {
+        return;
+    }
+
+    wlr_linux_dmabuf_v1_set_surface_feedback(linuxDmaBufV1, surface->wlrSurface, &feedback);
+
+    wlr_linux_dmabuf_feedback_v1_finish(&feedback);
 }
 
 
