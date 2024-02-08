@@ -328,7 +328,7 @@ int Server::run() {
 
     setenv("WAYLAND_DISPLAY", socket, true); 
     if (fork() == 0) {
-        execl("/bin/sh", "/bin/sh", "-c", "konsole", 0);
+        execl("/bin/sh", "/bin/sh", "-c", "firefox", 0);
     }
 
     LOG_INFO("server running...");
