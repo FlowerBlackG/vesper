@@ -9,7 +9,8 @@
 #pragma once
 
 #include "../../utils/wlroots-cpp.h"
-#include "./Server.h"
+#include "../../utils/ObjUtils.h"
+#include "./Cursor.h"
 
 namespace vesper::desktop::scene { class SceneTreeNode; }
 
@@ -28,10 +29,21 @@ namespace vesper::desktop::server {
 class View {
 
 public:
-    int init(Server* server, wlr_xdg_toplevel* xdgToplevel);
+
+    struct CreateOptions {
+        Server* server;
+        wlr_xdg_toplevel* xdgToplevel;
+    };
+
+    static View* create(const CreateOptions&);
 
     void focus(wlr_surface* surface);
-    void beginInteraction(Server::CursorMode cursorMode, uint32_t edges);
+    void beginInteraction(Cursor::Mode cursorMode, uint32_t edges);
+
+protected:
+    View() {}
+    VESPER_OBJ_UTILS_DISABLE_COPY(View);
+    int init(const CreateOptions&);
 
 public:
     wl_list link;

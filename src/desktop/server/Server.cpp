@@ -9,6 +9,7 @@
 
 #include "./Server.h"
 #include "./Keyboard.h"
+#include "./Cursor.h"
 
 #include "../../log/Log.h"
 #include "./View.h"
@@ -43,14 +44,15 @@ static void newXdgToplevelEventBridge(wl_listener* listener, void* data) {
 
     auto* toplevel = (wlr_xdg_toplevel*) data;
 
-    View* view = new (nothrow) View;
-LOG_TEMPORARY("view at: ", view);
+    View* view = View::create({
+        .server = server,
+        .xdgToplevel = toplevel
+    });
+    
     if (!view) {
         LOG_ERROR("failed to allocate View object!");
         return;
     }
-
-    view->init(server, toplevel);    
 
 }
 
@@ -76,7 +78,10 @@ static void newXdgPopupEventBridge(wl_listener* listener, void* data) {
 
     auto* parentTree = (scene::SceneTreeNode*) parent->data;
 
-    auto* sceneXdgSurface = scene::XdgSurface::create(parentTree, xdgPopup->base);
+    auto* sceneXdgSurface = scene::XdgSurface::create({
+        .parent = parentTree,
+        .wlrXdgSurface = xdgPopup->base
+    });
     
     if (sceneXdgSurface == nullptr) {
         LOG_ERROR("failed to create xdg surface!");
@@ -86,89 +91,6 @@ static void newXdgPopupEventBridge(wl_listener* listener, void* data) {
     xdgPopup->base->data = sceneXdgSurface->tree;
 }
 
-/**
- * 当鼠标产生“相对移动”时，本函数会被调用。
- */
-static void cursorMotionEventBridge(wl_listener* listener, void* data) {
-    Server* server = wl_container_of(listener, server, eventListeners.cursorMotion);
-
-    auto* event = (wlr_pointer_motion_event*) data;
-    wlr_cursor_move(
-        server->wlrCursor, 
-        &event->pointer->base,
-        event->delta_x, event->delta_y
-    );
-
-    server->processCursorMotion(event->time_msec);
-}
-
-/**
- * 当鼠标产生绝对位移时触发。例如，鼠标突然出现在某个角落。 
- */
-static void cursorMotionAbsoluteEventBridge(wl_listener* listener, void* data) {
-    Server* server = wl_container_of(listener, server, eventListeners.cursorMotionAbsolute);
-
-    auto* event = (wlr_pointer_motion_absolute_event*) data;
-
-    wlr_cursor_warp_absolute(
-        server->wlrCursor,
-        &event->pointer->base,
-        event->x, event->y
-    );
-
-    server->processCursorMotion(event->time_msec);
-}
-
-/**
- * 当鼠标按键被按下时触发。 
- */
-static void cursorButtonEventBridge(wl_listener* listener, void* data) {
-    
-    Server* server = wl_container_of(listener, server, eventListeners.cursorButton);
-
-    auto* event = (wlr_pointer_button_event*) data;
-
-    wlr_seat_pointer_notify_button(
-        server->wlrSeat, event->time_msec, event->button, event->state
-    );
-
-    double sx, sy;
-    wlr_surface* surface = nullptr;
-    View* view = server->desktopViewAt(
-        server->wlrCursor->x, server->wlrCursor->y, &surface, &sx, &sy
-    );
-
-    if (event->state == WLR_BUTTON_RELEASED) {
-        server->cursorMode = Server::CursorMode::PASSTHROUGH;
-        server->grabbedView = nullptr;
-    } else if (event->state == WLR_BUTTON_PRESSED) {
-        if (view) {
-            view->focus(surface);
-        }
-    }
-
-}
-
-/**
- * 由坐标轴事件触发。也就是说...比如滚动鼠标滚轮的时候。 
- */
-static void cursorAxisEventBridge(wl_listener* listener, void* data) {
-    Server* server = wl_container_of(listener, server, eventListeners.cursorAxis);
-
-    auto* event = (wlr_pointer_axis_event*) data;
-
-    wlr_seat_pointer_notify_axis(
-        server->wlrSeat, event->time_msec, event->orientation,
-        event->delta, event->delta_discrete, event->source,
-        event->relative_direction
-    );
-}
-
-static void cursorFrameEventBridge(wl_listener* listener, void* data) {
-    Server* server = wl_container_of(listener, server, eventListeners.cursorFrame);
-
-    wlr_seat_pointer_notify_frame(server->wlrSeat);
-}
 
 static void newInputEventBridge(wl_listener* listener, void* data) {
     Server* server = wl_container_of(listener, server, eventListeners.newInput);
@@ -178,23 +100,26 @@ static void newInputEventBridge(wl_listener* listener, void* data) {
         LOG_INFO("new input detected: keyboard");
         
         auto* wlrKeyboard = wlr_keyboard_from_input_device(device);
-        auto* keyboard = new (nothrow) Keyboard;
+        auto* keyboard = Keyboard::create({
+            .server = server,
+            .wlrKeyboard = wlrKeyboard,
+            .device = device
+        });
+
         if (!keyboard) {
             LOG_ERROR("failed to create keyboard!");
             return;
         }
 
-        keyboard->init(server, wlrKeyboard, device);
-
     } else if (device->type == WLR_INPUT_DEVICE_POINTER) {
         LOG_INFO("new input detected: pointer");
-        wlr_cursor_attach_input_device(server->wlrCursor, device);
+        wlr_cursor_attach_input_device(server->cursor->wlrCursor, device);
     } else {
         LOG_INFO("input device ignored: ", device->type);
     }
     
     uint32_t capability = WL_SEAT_CAPABILITY_POINTER;
-    if (!wl_list_empty(&server->wlKeyboards)) {
+    if (!wl_list_empty(&server->keyboards)) {
         capability |= WL_SEAT_CAPABILITY_KEYBOARD;
     }
 
@@ -215,7 +140,7 @@ static void requestSetCursorEventBridge(wl_listener* listener, void* data) {
 
     if (focusedClient == event->seat_client) {
         wlr_cursor_set_surface(
-            server->wlrCursor, event->surface,
+            server->cursor->wlrCursor, event->surface,
             event->hotspot_x, event->hotspot_y
         );
     }
@@ -238,13 +163,10 @@ Server::Server() {
 }
 
 Server::~Server() {
-    this->clear();
+    
 }
 
 int Server::run() {
-    if (initialized) {
-        return 0;
-    }
 
     this->wlDisplay = wl_display_create();
     auto waylandEventLoop = wl_display_get_event_loop(wlDisplay);
@@ -261,7 +183,8 @@ int Server::run() {
         return -1;
     }
 
-    this->wlrRenderer = wlr_pixman_renderer_create();
+    // todo
+    this->wlrRenderer = 0 ? wlr_renderer_autocreate(wlrBackend) : wlr_pixman_renderer_create();
     if (!wlrRenderer) {
         LOG_ERROR("failed to create wlroots renderer!");
         return -1;
@@ -281,7 +204,7 @@ int Server::run() {
 
     wlrOutputLayout = wlr_output_layout_create(wlDisplay);
 
-    wl_list_init(&wlOutputs);
+    wl_list_init(&outputs);
 
     eventListeners.newOutput.notify = newOutputEventBridge; 
     wl_signal_add(&wlrBackend->events.new_output, &eventListeners.newOutput);
@@ -307,34 +230,19 @@ int Server::run() {
     eventListeners.newXdgPopup.notify = newXdgPopupEventBridge;
     wl_signal_add(&wlrXdgShell->events.new_popup, &eventListeners.newXdgPopup);
 
-    // wlroots cursor 
+    // cursor 
 
-    wlrCursor = wlr_cursor_create();
-    wlr_cursor_attach_output_layout(wlrCursor, wlrOutputLayout);
+    this->cursor = Cursor::create({
+        .server = this,
+        .wlrOutputLayout = wlrOutputLayout,
+        .name = nullptr,
+        .size = 24
+    });
 
-    // wlr xcursor manager
-    // it loads up xcursor themes to source cursor images from and 
-    // make sure that cursor images are available at all scale factors
-    // on screen.
-    wlrXCursorMgr = wlr_xcursor_manager_create(nullptr, 24);
-
-    // cursor
-
-    cursorMode = CursorMode::PASSTHROUGH;
-    eventListeners.cursorMotion.notify = cursorMotionEventBridge;
-    wl_signal_add(&wlrCursor->events.motion, &eventListeners.cursorMotion);
-    eventListeners.cursorMotionAbsolute.notify = cursorMotionAbsoluteEventBridge;
-    wl_signal_add(&wlrCursor->events.motion_absolute, &eventListeners.cursorMotionAbsolute);
-    eventListeners.cursorButton.notify = cursorButtonEventBridge;
-    wl_signal_add(&wlrCursor->events.button, &eventListeners.cursorButton);
-    eventListeners.cursorAxis.notify = cursorAxisEventBridge;
-    wl_signal_add(&wlrCursor->events.axis, &eventListeners.cursorAxis);
-    eventListeners.cursorFrame.notify = cursorFrameEventBridge;
-    wl_signal_add(&wlrCursor->events.frame, &eventListeners.cursorFrame);
 
     // wayland seat
 
-    wl_list_init(&wlKeyboards);
+    wl_list_init(&keyboards);
     eventListeners.newInput.notify = newInputEventBridge;
     wl_signal_add(&wlrBackend->events.new_input, &eventListeners.newInput);
     wlrSeat = wlr_seat_create(wlDisplay, "seat0");
@@ -375,16 +283,14 @@ int Server::run() {
 
     wl_display_destroy_clients(wlDisplay);
     scene->destroyTree();
+    delete scene;
+    scene = nullptr;
     
-    wlr_xcursor_manager_destroy(wlrXCursorMgr);
+    delete cursor;
+    cursor = nullptr;
 
     wl_display_destroy(wlDisplay);
 
-    return 0;
-}
-
-
-int Server::clear() {
     return 0;
 }
 
@@ -405,102 +311,18 @@ void Server::newOutputEventHandler(wlr_output* newOutput) {
     wlr_output_commit_state(newOutput, &state);
     wlr_output_state_finish(&state);
 
-    Output* output = new (nothrow) Output;
+    Output* output = Output::create({
+        .server = this,
+        .wlrOutput = newOutput
+    });
+
     if (!output) {
         LOG_ERROR("failed to create output!");
         return;
     }
 
-    output->init(this, newOutput);
-
-
 }
 
-void Server::processCursorMotion(uint32_t timeMsec) {
-    
-    // todo
-//    Output* p = wl_container_of(this->wlOutputs.next, p, link);
-//    wlr_output_schedule_frame(p->wlrOutput);
-    
-    if (cursorMode == CursorMode::MOVE) {
-        processCursorMove(timeMsec);
-        return;
-    } else if (cursorMode == CursorMode::RESIZE) {
-        processCursorResize(timeMsec);
-        return;
-    }
-
-    double sx, sy;
-    wlr_surface* surface = nullptr;
-    auto* topLevel = this->desktopViewAt(
-        wlrCursor->x, wlrCursor->y, &surface, &sx, &sy
-    );
-
-    if (!topLevel) {
-        // 如果鼠标不在某个 View 上，就显示默认图像。
-        wlr_cursor_set_xcursor(wlrCursor, wlrXCursorMgr, "default");
-    }
-
-    if (surface) {
-        wlr_seat_pointer_notify_enter(wlrSeat, surface, sx, sy);
-        wlr_seat_pointer_notify_motion(wlrSeat, timeMsec, sx, sy);
-    } else {
-        wlr_seat_pointer_clear_focus(wlrSeat);
-    }
-
-}
-
-
-void Server::processCursorMove(uint32_t timeMsec) {
-    grabbedView->sceneTree->setPosition(wlrCursor->x - grabX, wlrCursor->y - grabY);
-}
-
-
-void Server::processCursorResize(uint32_t timeMsec) {
-    View* view = grabbedView;
-    double borderX = wlrCursor->x - grabX;
-    double borderY = wlrCursor->y - grabY;
-    int newLeft = grabGeoBox.x;
-    int newRight = grabGeoBox.x + grabGeoBox.width;
-    int newTop = grabGeoBox.y;
-    int newBottom = grabGeoBox.y + grabGeoBox.height;
-
-    if (resizeEdges & WLR_EDGE_TOP) {
-        newTop = borderY;
-        if (newTop >= newBottom) {
-            newTop = newBottom - 1;
-        }
-    } else if (resizeEdges & WLR_EDGE_BOTTOM) {
-        newBottom = borderY;
-        if (newBottom <= newTop) {
-            newBottom = newTop + 1;
-        }
-    }
-
-    if (resizeEdges & WLR_EDGE_LEFT) {
-        newLeft = borderX;
-        if (newLeft >= newRight) {
-            newLeft = newRight - 1;
-        }
-    } else if (resizeEdges & WLR_EDGE_RIGHT) {
-        newRight = borderX;
-        if (newRight <= newLeft) {
-            newRight = newLeft + 1;
-        }
-    }
-
-    wlr_box geoBox;
-    wlr_xdg_surface_get_geometry(view->wlrXdgToplevel->base, &geoBox);
-
-    view->sceneTree->setPosition(newLeft - geoBox.x, newTop - geoBox.y);
-
-    int newWidth = newRight - newLeft;
-    int newHeight = newBottom - newTop;
-
-    wlr_xdg_toplevel_set_size(
-        view->wlrXdgToplevel, newWidth, newHeight
-    );
-}
 
 View* Server::desktopViewAt(
     double lx, double ly, wlr_surface** surface, 

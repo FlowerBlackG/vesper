@@ -10,6 +10,7 @@
 
 #include "../../log/Log.h"
 #include "../../utils/wlroots-cpp.h"
+#include "../../utils/ObjUtils.h"
 
 namespace vesper::desktop::scene {
 
@@ -18,10 +19,22 @@ class SceneTreeNode;
 
 class XdgSurface {
 public:
-    static XdgSurface* create(SceneTreeNode* parent, wlr_xdg_surface* wlrXdgSurface);
-    int init(SceneTreeNode* parent, wlr_xdg_surface* wlrXdgSurface);
 
+    struct CreateOptions {
+        SceneTreeNode* parent;
+        wlr_xdg_surface* wlrXdgSurface;
+    };
+
+    static XdgSurface* create(const CreateOptions&);
+    
     void updatePosition();
+
+    ~XdgSurface();
+
+protected:
+    XdgSurface() {}
+    VESPER_OBJ_UTILS_DISABLE_COPY(XdgSurface)
+    int init(const CreateOptions&);
 
 public:
     SceneTreeNode* tree = nullptr;

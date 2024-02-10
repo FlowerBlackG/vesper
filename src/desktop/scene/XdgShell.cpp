@@ -36,9 +36,7 @@ static void xdgSurfaceDestroyEventBridge(wl_listener* listener, void* data) {
         listener, sceneXdgSurface, eventListeners.xdgSurfaceDestroy
     );
 
-    auto* tree = sceneXdgSurface->tree;
-    tree->destroy();
-    delete tree;
+    delete sceneXdgSurface->tree;
 }
 
 
@@ -69,25 +67,12 @@ static void xdgSurfaceCommitEventBridge(wl_listener* listener, void* data) {
 }
 
 
-XdgSurface* XdgSurface::create(SceneTreeNode* parent, wlr_xdg_surface* wlrXdgSurface) {
-    auto* p = new (nothrow) XdgSurface;
-    if (!p) {
-        return nullptr;
-    }
+VESPER_OBJ_UTILS_IMPL_CREATE(XdgSurface, XdgSurface::CreateOptions)
 
-    if (p->init(parent, wlrXdgSurface)) {
-        delete p;
-        return nullptr;
-    }
+int XdgSurface::init(const CreateOptions& options) {
+    this->wlrXdgSurface = options.wlrXdgSurface;
 
-    return p;
-}
-
-
-int XdgSurface::init(SceneTreeNode* parent, wlr_xdg_surface* wlrXdgSurface) {
-    this->wlrXdgSurface = wlrXdgSurface;
-
-    this->tree = SceneTreeNode::create(parent);
+    this->tree = SceneTreeNode::create(options.parent);
     if (this->tree == nullptr) {
         LOG_ERROR("failed to create SceneTreeNode!");
         return -1;
@@ -95,7 +80,6 @@ int XdgSurface::init(SceneTreeNode* parent, wlr_xdg_surface* wlrXdgSurface) {
 
     auto* subSurfaceTree = SubSurfaceTree::create(this->tree, wlrXdgSurface->surface);
     if (subSurfaceTree == nullptr) {
-        this->tree->destroy();
         delete this->tree;
         return -1;
     }
@@ -121,6 +105,10 @@ int XdgSurface::init(SceneTreeNode* parent, wlr_xdg_surface* wlrXdgSurface) {
     this->updatePosition();
 
     return 0;
+}
+
+XdgSurface::~XdgSurface() {
+
 }
 
 

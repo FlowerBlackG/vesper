@@ -26,7 +26,6 @@ int SceneNode::init(SceneTreeNode* parent) {
     this->parent = parent;
     wl_signal_init(&basicEvents.destroy);
     wl_list_init(&link);
-    pixman_region32_init(&visibleArea);
 
     if (parent) {
         wl_list_insert(parent->children.prev, &link); // 尾插。
@@ -38,18 +37,10 @@ int SceneNode::init(SceneTreeNode* parent) {
 }
 
 
-void SceneNode::destroy(std::function<void(Scene*)> typeDestroy) {
+SceneNode::~SceneNode() {
     wl_signal_emit_mutable(&basicEvents.destroy, nullptr);
-    
     wlr_addon_set_finish(&this->addons);
-
-    this->setEnabled(false);
-
-    auto* scene = getRootScene();
-    typeDestroy(scene);
-
     wl_list_remove(&link);
-    pixman_region32_fini(&visibleArea);
 }
 
 
@@ -73,17 +64,8 @@ void SceneNode::outputUpdate(
         wl_list_for_each(child, &tree->children, link) {
             child->outputUpdate(outputs, ignore, force);
         }
-    } else {
-        updateNodeUpdateOutputs(outputs, ignore, force);
-    }
-}
-
-
-void SceneNode::updateNodeUpdateOutputs(wl_list* outputs, Output* ignore, Output* force) {
-    if (type() == SceneNodeType::BUFFER) {
+    } else if (type() == SceneNodeType::BUFFER) {
         ((SceneBufferNode*) this)->updateNodeUpdateOutputs(outputs, ignore, force);
-    } else {
-        return;
     }
 }
 
@@ -110,13 +92,11 @@ void SceneNode::update(pixman_region32_t* damage) {
         damage = &visible;
     }
 
-    pixman_region32_t updateRegion;
-    pixman_region32_init(&updateRegion);
-    pixman_region32_copy(&updateRegion, damage);
-    this->bounds(x, y, &updateRegion);
+    pixman::Region32 updateRegion = damage;
+    
+    this->bounds(x, y, updateRegion.raw());
 
-    scene->updateRegion(&updateRegion);
-    pixman_region32_fini(&updateRegion);
+    scene->updateRegion(updateRegion);
 
     this->visibility(damage);
     scene->damageOutputs(damage);
@@ -190,7 +170,7 @@ void SceneNode::visibility(pixman_region32_t* visible) {
             child->visibility(visible);
         }
     } else { // buffer or rect
-        pixman_region32_union(visible, visible, &visibleArea);
+        pixman_region32_union(visible, visible, visibleArea.raw());
     }
 }
 
@@ -322,7 +302,7 @@ void SceneNode::opaqueRegion(int x, int y, pixman_region32_t* opaque) {
         }
 
         if (!buf->bufferIsOpaque) {
-            pixman_region32_copy(opaque, &buf->opaqueRegion);
+            pixman_region32_copy(opaque, buf->opaqueRegion.raw());
             pixman_region32_intersect_rect(opaque, opaque, 0, 0, width, height);
             pixman_region32_translate(opaque, x, y);
             return;
@@ -343,7 +323,7 @@ void SceneNode::sendFrameDone(Output* sceneOutput, timespec* now) {
 
         auto* p = (SceneBufferNode*) this;
         if (p->primaryOutput == sceneOutput) {
-            if (pixman_region32_not_empty(&p->visibleArea)) {
+            if (p->visibleArea.notEmpty()) {
                 wl_signal_emit_mutable(&p->events.frameDone, now);
             }
         }
@@ -422,8 +402,8 @@ static bool sceneNodeAtOnDiscover(SceneNode* node, int lx, int ly, void* data) {
     if (node->type() == SceneNodeType::BUFFER) {
         auto* buf = (SceneBufferNode*) node;
 
-        if (false) {
-            return false; // todo: point_accepts_input
+        if (buf->pointAcceptsInput && !buf->pointAcceptsInput(buf, &rx, &ry)) {
+            return false;
         }
     }
 
@@ -470,12 +450,8 @@ SceneNode* SceneNode::nodeAt(double lx, double ly, double* nx, double* ny) {
 
 SceneTreeNode* SceneTreeNode::create(SceneTreeNode* parent) { 
     SceneTreeNode* p = new (std::nothrow) SceneTreeNode;
-    
-    if (!p) { 
-        return nullptr; 
-    }
 
-    if (p->init(parent)) {
+    if (p && p->init(parent)) {
         delete p;
         return nullptr;
     }
@@ -488,42 +464,26 @@ int SceneTreeNode::init(SceneTreeNode* parent) {
     return reinterpret_cast<SceneNode*>(this)->init(parent);
 }
 
-void SceneTreeNode::destroy() {
+SceneTreeNode::~SceneTreeNode() {
+    
+    this->setEnabled(false);
+    Scene* scene = this->getRootScene();
 
-    SceneNode* base = this;
-
-    base->destroy( [&] (Scene* scene) {
-
-        if (this == scene->tree) {
-            Output *output, *tmp;
-            wl_list_for_each_safe(output, tmp, &scene->outputs, link) {
-                output->destroy();
-                delete output;
-            }
-
-            wl_list_remove(&scene->eventListeners.linuxDmaBufV1Destroy.link);
+    if (this == scene->tree) {
+        Output *output, *tmp;
+        wl_list_for_each_safe(output, tmp, &scene->outputs, link) {
+            delete output;
         }
 
-        SceneNode *child, *tmp;
+        wl_list_remove(&scene->eventListeners.linuxDmaBufV1Destroy.link);
+    }
 
-        wl_list_for_each_safe(child, tmp, &this->children, link) {
+    SceneNode *child, *tmp;
 
-            if (child->type() == SceneNodeType::TREE) {
-                ((SceneTreeNode*) child)->destroy();
-            } else if (child->type() == SceneNodeType::BUFFER) {
-                ((SceneBufferNode*) child)->destroy();
-            } else if (child->type() == SceneNodeType::RECT) {
-                ((SceneRectNode*) child)->destroy();
-            } else {
-                LOG_ERROR("bad type for scene node: ", (int64_t) child->type());
-            }
-
-            delete child;
-            
-        } 
-
-    });
-
+    wl_list_for_each_safe(child, tmp, &this->children, link) {
+        delete child;
+    }
+    
 }
 
 /* ------------ SceneTreeNode 结束 ------------ */
@@ -554,7 +514,7 @@ static void sceneBufferNodeSetBuffer(SceneBufferNode* buf, wlr_buffer* wlrBuffer
     buf->wlrBuffer = wlr_buffer_lock(wlrBuffer);
     buf->bufferWidth = wlrBuffer->width;
     buf->bufferHeight = wlrBuffer->height;
-    buf->bufferIsOpaque = false; // todo
+    buf->bufferIsOpaque = true; // todo
 
     buf->eventListeners.bufferRelease.notify = bufferReleaseEventBridge;
     wl_signal_add(&wlrBuffer->events.release, &buf->eventListeners.bufferRelease);
@@ -594,7 +554,6 @@ int SceneBufferNode::init(
     wl_signal_init(&events.outputLeave);
     wl_signal_init(&events.outputSample);
     wl_signal_init(&events.frameDone);
-    pixman_region32_init(&opaqueRegion);
     wl_list_init(&eventListeners.bufferRelease.link);
 
     opacity = 1;
@@ -612,23 +571,24 @@ bool SceneBufferNode::invisible() {
 }
 
 
-void SceneBufferNode::destroy() {
-    SceneNode* base = this;
-    base->destroy([&] (Scene* scene) {
-        uint64_t active = this->activeOutputs;
-        if (active) {
-            Output* output;
-            wl_list_for_each(output, &scene->outputs, link) {
-                if (active & (1ull << output->index)) {
-                    wl_signal_emit_mutable(&this->events.outputLeave, output);
-                }
-            }
+SceneBufferNode::~SceneBufferNode() {
+    
+    this->setEnabled(false);
+    Scene* scene = this->getRootScene();
 
-            wlr_texture_destroy(this->texture);
-            sceneBufferNodeSetBuffer(this, nullptr);
-            pixman_region32_fini(&this->opaqueRegion);
+    uint64_t active = this->activeOutputs;
+    if (active) {
+        Output* output;
+        wl_list_for_each(output, &scene->outputs, link) {
+            if (active & (1ull << output->index)) {
+                wl_signal_emit_mutable(&this->events.outputLeave, output);
+            }
         }
-    });
+
+        wlr_texture_destroy(this->texture);
+        sceneBufferNodeSetBuffer(this, nullptr);
+    }
+    
 }
 
 void SceneBufferNode::updateNodeUpdateOutputs(
@@ -661,7 +621,7 @@ void SceneBufferNode::updateNodeUpdateOutputs(
         );
 
         pixman::Region32 intersection;
-        intersection.intersectRect(&visibleArea, outputBox);
+        intersection.intersectRect(visibleArea, outputBox);
 
         if (intersection.notEmpty()) {
             auto overlap = intersection.regionArea();
@@ -823,8 +783,8 @@ void SceneBufferNode::setBuffer(wlr_buffer* wlrBuffer, pixman_region32_t* damage
             outputDamage.raw(), outputDamage.raw(), distX >= distY ? distX : distY
         );
 
-        pixman::Region32 cullRegion;
-        pixman_region32_copy(cullRegion.raw(), &this->visibleArea);
+        pixman::Region32 cullRegion = this->visibleArea;
+        
         scaleOutputDamage(cullRegion.raw(), outputScale);
         pixman_region32_translate(cullRegion.raw(), -lx * outputScale, -ly * outputScale);
         pixman_region32_intersect(outputDamage.raw(), outputDamage.raw(), cullRegion.raw());
@@ -881,11 +841,11 @@ void SceneBufferNode::unmarkClientBuffer() {
 
 
 void SceneBufferNode::setOpaqueRegion(pixman_region32_t* opaque) {
-    if (pixman_region32_equal(&opaqueRegion, opaque)) {
+    if (this->opaqueRegion == opaque) {
         return;
     }
 
-    pixman_region32_copy(&this->opaqueRegion, opaque);
+    pixman_region32_copy(this->opaqueRegion.raw(), opaque);
 
     int x, y;
     if (!this->coords(&x, &y)) {
@@ -895,6 +855,11 @@ void SceneBufferNode::setOpaqueRegion(pixman_region32_t* opaque) {
     pixman::Region32 updateRegion;
     bounds(x, y, updateRegion.raw());
     this->getRootScene()->updateRegion(updateRegion.raw());
+}
+
+
+void SceneBufferNode::setOpaqueRegion(vesper::bindings::pixman::Region32& opaque) {
+    this->setOpaqueRegion(opaque.raw());   
 }
 
 
@@ -972,9 +937,8 @@ int SceneRectNode::init(
     return 0;
 }
 
-void SceneRectNode::destroy() {
-    SceneNode* base = this;
-    base->destroy([] (Scene*) {});
+SceneRectNode::~SceneRectNode() {
+    this->setEnabled(false);
 }
 
 bool SceneRectNode::invisible() {

@@ -18,6 +18,10 @@ class Region32 {
 
 public:
     Region32();
+    Region32(const Region32& src);
+    Region32(pixman_region32_t* cObj);
+    Region32(pixman_region32_t& cObj);
+
     ~Region32();
 
 
@@ -52,11 +56,27 @@ public:
     pixman_box32_t* rectangles(int* nRects);
     uint32_t regionArea();
 
+public:
+
+    Region32& operator = (const Region32&) = delete;
+
+    Region32& operator -= (const Region32& other);
+    Region32& operator -= (const pixman_region32_t* other);
+    Region32& operator -= (const pixman_region32_t& other);
+    Region32& operator += (const Region32& other);
+    Region32& operator += (const pixman_region32_t* other);
+    Region32& operator += (const pixman_region32_t& other);
+
+    bool operator == (const Region32& other) const;
+    bool operator == (const pixman_region32_t* other) const;
+    bool operator == (const pixman_region32_t& other) const;
+
 protected:
     pixman_region32_t region32;
 
 public:
     inline pixman_region32_t* raw() { return &region32; }
+    inline const pixman_region32_t* raw() const { return &region32; }
 
 };
 

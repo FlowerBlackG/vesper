@@ -32,7 +32,7 @@ public:
     SceneBufferNode* buffer;
     wlr_surface* wlrSurface;
 
-    wlr_box clip;
+    wlr_box clip = { .x = 0, .y = 0, .width = 0, .height = 0 };
     wlr_addon addon;
 
     struct {
@@ -87,7 +87,7 @@ public:
     wlr_addon sceneAddon;
     wlr_addon surfaceAddon;
 
-    wlr_box clip;
+    wlr_box clip = { .x = 0, .y = 0, .width = 0, .height = 0 };
 
 
 };

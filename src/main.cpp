@@ -21,6 +21,8 @@
 #include <wlr/version.h>
 #include <pixman-version.h>
 
+#include <rfb/rfb.h>
+
 using namespace std;
 using namespace vesper;
 
@@ -47,10 +49,41 @@ int main(int argc, const char* argv[]) {
     printVersion();
 
     LOG_INFO("creating desktop server")
+
+    // ------ todo ------
+/*
+    int8_t* buf = new int8_t[1280*720*4];
+    rfbScreenInfoPtr server = rfbGetScreen(0, nullptr, 1280, 720, 8, 3, 4);
+    server->desktopName = "vnc test";
+    server->frameBuffer = (char*) buf;
+    server->alwaysShared = true;
     
+
+    rfbInitServer(server);
+
+
+    for (int i = 0; i < 1280; i++) {
+        for (int j = 0; j < 720; j++) {
+            ((int*) buf)[i * 720 + j] = 0xff00ff;
+        }
+    }
+    
+
+    while (1) {
+        rfbMarkRectAsModified(server, 0, 0, 1280, 720);
+        rfbProcessEvents(server, 1000000);
+    }
+
+    rfbShutdownServer(server, true);
+
+
+    delete[] buf;*/
+
+    // ------ todo ------
+#if 1 // todo    
     desktop::server::Server server;
     server.run();
-
+#endif
     LOG_INFO("bye~");
     return 0;
 }

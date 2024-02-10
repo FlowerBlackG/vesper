@@ -15,6 +15,8 @@
 #pragma once
 
 #include "../../utils/wlroots-cpp.h"
+#include "../../utils/ObjUtils.h"
+#include "../../bindings/pixman.h"
 #include <new>
 #include <functional>
 
@@ -39,14 +41,13 @@ public:
     virtual inline SceneNodeType type() = 0;
 
 public:
-    int init(SceneTreeNode* parent);
     Scene* getRootScene();
+    int init(SceneTreeNode* parent);
 
     void outputUpdate(
         wl_list* outputs, Output* ignore, Output* force
     );
     
-    void updateNodeUpdateOutputs(wl_list* outputs, Output* ignore, Output* force);
     void update(pixman_region32_t* damage);
 
     bool coords(int* x, int* y);
@@ -59,6 +60,20 @@ public:
 
     void getSize(int* width, int* height);
 
+    /**
+     * 搜索给定区域，寻找该区域内是否存在叶节点，并为遍历到的叶节点调用 onDiscover 处理方法。
+     * 
+     * @param box 搜索区域
+     * 
+     * @param onDiscover 当发现一个子节点时，调用。
+     *                   注意，并不是每个叶节点都会被遍历到。当 onDiscover 返回 true 时，
+     *                   遍历过程会被提前结束。如果需要强制遍历所有叶节点，onDiscover 应
+     *                   总是返回 false。 
+     * 
+     * @param data 可以额外携带的信息。将会原封不动交给 onDiscover 方法。
+     * 
+     * @return 区域内是否存在叶节点。
+     */
     bool nodesInBox(
         wlr_box* box, 
         std::function<bool (SceneNode* node, int x, int y, void* data)> onDiscover, 
@@ -79,6 +94,10 @@ public:
 
     SceneNode* nodeAt(double lx, double ly, double* nx, double* ny);
 
+protected:
+    SceneNode() {}
+    VESPER_OBJ_UTILS_DISABLE_COPY(SceneNode);
+
 public:
     SceneTreeNode* parent = nullptr;
 
@@ -98,14 +117,14 @@ public:
         wl_signal destroy;
     } basicEvents;
 
-    pixman_region32_t visibleArea;
+    vesper::bindings::pixman::Region32 visibleArea;
 
     void* data = nullptr;
 
     wlr_addon_set addons;
 
 public:
-    void destroy(std::function<void(Scene*)> typeDestroy);
+    virtual ~SceneNode();
 
 };
 
@@ -118,7 +137,7 @@ public:
 
     static SceneTreeNode* create(SceneTreeNode* parent);
 
-    void destroy();
+    ~SceneTreeNode();
     int init(SceneTreeNode* parent);
 
     virtual inline bool invisible() override { return true; };
@@ -150,7 +169,7 @@ public:
     static SceneBufferNode* create(
         SceneTreeNode* parent, wlr_buffer* wlrBuffer
     ); 
-    void destroy();
+    ~SceneBufferNode();
     int init(
         SceneTreeNode* parent, wlr_buffer* wlrBuffer
     );
@@ -165,6 +184,7 @@ public:
     void unmarkClientBuffer();
 
     void setOpaqueRegion(pixman_region32_t* opaque);
+    void setOpaqueRegion(vesper::bindings::pixman::Region32& opaque);
     void setSourceBox(wlr_fbox* srcBox);
     void setDstSize(int width, int height);
     void setTransform(wl_output_transform transform);
@@ -181,7 +201,7 @@ public:
         wl_signal frameDone;
     } events;
 
-    // todo: wlr_scene_buffer_point_accepts_input_func_t point_accepts_input;
+    std::function<bool (SceneBufferNode*, double* sx, double* sy)> pointAcceptsInput;
 
     Output* primaryOutput = nullptr;
 
@@ -192,7 +212,7 @@ public:
 
     wl_output_transform transform;
 
-    pixman_region32_t opaqueRegion;
+    vesper::bindings::pixman::Region32 opaqueRegion;
     uint64_t activeOutputs = 0;
     wlr_texture* texture = nullptr;
 
@@ -218,7 +238,7 @@ public:
         SceneTreeNode* parent, int width, int height, const float color[4]
     ); 
 
-    void destroy();
+    ~SceneRectNode();
     int init(
         SceneTreeNode* parent, int width, int height, const float color[4]
     );

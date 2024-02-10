@@ -17,6 +17,7 @@ namespace vesper::desktop::scene { class OutputLayout; }
 namespace vesper::desktop::server {
     
 class View;
+class Cursor;
 
 /**
  * Wayland Server
@@ -30,17 +31,11 @@ public:
     Server();
     ~Server();
     int run();
-    int clear();
 
 public:
     void newOutputEventHandler(wlr_output* newOutput);
     
     
-    void processCursorMotion(uint32_t timeMsec);
-    
-    void processCursorMove(uint32_t timeMsec);
-    void processCursorResize(uint32_t timeMsec);
-
     View* desktopViewAt(
         double lx, double ly, wlr_surface** surface, 
         double* sx, double* sy
@@ -48,13 +43,7 @@ public:
 
 public:
 
-    enum class CursorMode {
-        PASSTHROUGH,
-        MOVE,
-        RESIZE
-    };
-
-    bool initialized = false;
+    
 
     wl_display* wlDisplay = nullptr;
     wlr_backend* wlrBackend = nullptr;
@@ -65,23 +54,22 @@ public:
     vesper::desktop::scene::Scene* scene = nullptr;
     vesper::desktop::scene::OutputLayout* sceneLayout = nullptr;
 
-    wl_list wlOutputs;
+    /**
+     * 
+     * 成员类型：scene::server::Output
+     */
+    wl_list outputs;
 
     wl_list views;
     wlr_xdg_shell* wlrXdgShell = nullptr;
 
-    wlr_cursor* wlrCursor = nullptr;
-    wlr_xcursor_manager* wlrXCursorMgr = nullptr;
-    CursorMode cursorMode = CursorMode::PASSTHROUGH;
+    Cursor* cursor = nullptr;
 
-    View* grabbedView = nullptr;
-    double grabX;
-    double grabY;
-    wlr_box grabGeoBox;
-
-    uint32_t resizeEdges = 0;
-
-    wl_list wlKeyboards;
+    /**
+     * 
+     * 成员类型：scene::server::Keyboard
+     */
+    wl_list keyboards;
     wlr_seat* wlrSeat = nullptr;
 
 public:
@@ -90,12 +78,6 @@ public:
         
         wl_listener newXdgToplevel;
         wl_listener newXdgPopup;
-
-        wl_listener cursorMotion;
-        wl_listener cursorMotionAbsolute;
-        wl_listener cursorButton;
-        wl_listener cursorAxis;
-        wl_listener cursorFrame;
 
         wl_listener newInput;
         wl_listener requestSetCursor;

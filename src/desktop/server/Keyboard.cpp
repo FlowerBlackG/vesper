@@ -61,6 +61,7 @@ static void keyEventBridge(wl_listener* listener, void* data) {
 
     if (!handled) {
         // 如果 vesper 自己处理不了，就把它交给客户端处理～
+        
         wlr_seat_set_keyboard(seat, keyboard->wlrKeyboard);
         wlr_seat_keyboard_notify_key(seat, event->time_msec, event->keycode, event->state);
     }
@@ -78,10 +79,12 @@ static void destroyEventBridge(wl_listener* listener, void* data) {
     delete keyboard;
 }
 
-int Keyboard::init(Server* server, wlr_keyboard* wlrKeyboard, wlr_input_device* device) {
+VESPER_OBJ_UTILS_IMPL_CREATE(Keyboard, Keyboard::CreateOptions)
+
+int Keyboard::init(const CreateOptions& options) {
     
-    this->server = server;
-    this->wlrKeyboard = wlrKeyboard;
+    this->server = options.server;
+    this->wlrKeyboard = options.wlrKeyboard;
 
     // xkb keymap. 默认采用美式键盘布局。
 
@@ -103,11 +106,11 @@ int Keyboard::init(Server* server, wlr_keyboard* wlrKeyboard, wlr_input_device* 
     wl_signal_add(&wlrKeyboard->events.key, &eventListeners.key);
 
     eventListeners.destroy.notify = destroyEventBridge;
-    wl_signal_add(&device->events.destroy, &eventListeners.destroy);
+    wl_signal_add(&options.device->events.destroy, &eventListeners.destroy);
 
     wlr_seat_set_keyboard(server->wlrSeat, wlrKeyboard);
 
-    wl_list_insert(&server->wlKeyboards, &link);
+    wl_list_insert(&server->keyboards, &link);
 
     return 0;
 }

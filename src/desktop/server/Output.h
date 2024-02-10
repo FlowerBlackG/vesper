@@ -9,6 +9,7 @@
 #pragma once
 
 #include "../../utils/wlroots-cpp.h"
+#include "../../utils/ObjUtils.h"
 
 namespace vesper::desktop::server {
 
@@ -23,11 +24,19 @@ class Output {
 
 public:
 
-    int init(Server* server, wlr_output* output);
+    struct CreateOptions {
+        Server* server;
+        wlr_output* wlrOutput;
+    };
+
+    static Output* create(const CreateOptions&);
 
     void frameEventHandler();
 
 protected:
+    Output() {};
+    int init(const CreateOptions&);
+    VESPER_OBJ_UTILS_DISABLE_COPY(Output);
 
 
 public:

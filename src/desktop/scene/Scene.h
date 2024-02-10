@@ -9,6 +9,7 @@
 #pragma once
 
 #include "../../utils/wlroots-cpp.h"
+#include "../../bindings/pixman.h"
 
 namespace vesper::desktop::scene {
 
@@ -36,6 +37,7 @@ public:
 
     void destroyTree();
 
+    void updateRegion(vesper::bindings::pixman::Region32& updateRegion);
     void updateRegion(pixman_region32_t* updateRegion);
     void damageOutputs(pixman_region32_t* damage);
 

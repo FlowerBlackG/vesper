@@ -9,6 +9,7 @@
 #pragma once
 
 #include "../../utils/wlroots-cpp.h"
+#include "../../utils/ObjUtils.h"
 
 namespace vesper::desktop::server {
 
@@ -17,7 +18,21 @@ class Server;
 class Keyboard {
 
 public:
-    int init(Server* server, wlr_keyboard* wlrKeyboard, wlr_input_device* device);
+
+    struct CreateOptions {
+        Server* server;
+        wlr_keyboard* wlrKeyboard;
+        wlr_input_device* device;
+    };
+
+    static Keyboard* create(const CreateOptions& options);
+
+protected:
+    Keyboard() {};
+
+    VESPER_OBJ_UTILS_DISABLE_COPY(Keyboard);
+
+    int init(const CreateOptions& options);
 
 
 public:

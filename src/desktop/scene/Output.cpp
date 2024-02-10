@@ -42,17 +42,9 @@ static void outputCommitEventBridge(wl_listener* listener, void* data) {
 
     if (state->committed & WLR_OUTPUT_STATE_DAMAGE) {
         if (wlr_swapchain_has_buffer(output->wlrOutput->swapchain, state->buffer)) {
-            pixman_region32_subtract(
-                &output->pendingCommitDamage, 
-                &output->pendingCommitDamage, 
-                &state->damage
-            );
+            output->pendingCommitDamage -= state->damage;
         } else {
-            pixman_region32_union(
-                &output->pendingCommitDamage,
-                &output->pendingCommitDamage,
-                &state->damage
-            );
+            output->pendingCommitDamage += state->damage;
         }
     }
 }
@@ -75,7 +67,6 @@ static void outputNeedsFrameEventBridge(wl_listener* listener, void* data) {
 
 static void outputDestroyEventBridge(wlr_addon* addon) {
     Output* output = wl_container_of(addon, output, addon);
-    output->destroy();
     delete output;
 }
 
@@ -88,11 +79,8 @@ wlr_addon_interface sceneOutputAddonImpl = {
 
 Output* Output::create(Scene* scene, wlr_output* wlrOutput) {
     auto* p = new (nothrow) Output;
-    if (!p) {
-        return nullptr;
-    }
 
-    if (p->init(scene, wlrOutput)) {
+    if (p && p->init(scene, wlrOutput)) {
         delete p;
         return nullptr;
     }
@@ -105,12 +93,9 @@ int Output::init(Scene* scene, wlr_output* wlrOutput) {
     this->wlrOutput = wlrOutput;
     this->scene = scene;
 
-    wl_array_init(&this->renderList);
-
     wlr_addon_init(&this->addon, &wlrOutput->addons, scene, &sceneOutputAddonImpl);
     
     wlr_damage_ring_init(&this->wlrDamageRing);
-    pixman_region32_init(&this->pendingCommitDamage);
    
     int prevOutputIndex = -1;
     wl_list* prevOutputLink = &scene->outputs;
@@ -172,7 +157,7 @@ void Output::updateGeometry(bool forceUpdate) {
 
 bool Output::commit(StateOptions* options) {
 
-    if (!wlrOutput->needs_frame && pixman_region32_empty(&pendingCommitDamage)) {
+    if (!wlrOutput->needs_frame && pendingCommitDamage.empty()) {
         return true;
     }
 
@@ -211,15 +196,9 @@ static void wlrOutputPendingResolution(
 
 struct RenderListConstructorData {
     wlr_box box;
-    wl_array* renderList;
+    std::vector<Output::RenderListEntry>* renderList;
     bool calculateVisibility;
-};
-
-
-struct RenderListEntry {
-    SceneNode* node;
-    bool sentDmaBufFeedback;
-    int x, y;
+    int nodeCount;
 };
 
 
@@ -233,50 +212,34 @@ static bool constructRenderListIterator(
     }
 
     pixman::Region32 intersection;
-    intersection.intersectRect(&node->visibleArea, data->box);
-    if (intersection.empty()) {
+    intersection.intersectRect(node->visibleArea, data->box);
+    if (intersection.empty() && false) { // todo
+
         return false;
     }
 
+    // 添加一个待渲染节点。
 
-    RenderListEntry* entry = (RenderListEntry*) wl_array_add(data->renderList, sizeof(*entry));
-    if (!entry) {
-        return false;
+    auto& renderList = *(data->renderList);
+
+    if (data->renderList->size() <= data->nodeCount) {
+        data->renderList->emplace_back();
     }
 
-    entry->node = node;
-    entry->x = x;
-    entry->y = y;
+    if (data->renderList->size() > data->nodeCount) {
 
+        auto& entry = renderList[data->nodeCount];
+        entry = {
+            .node = node,
+            .sentDmaBufFeedback = false,
+            .x = x,
+            .y = y
+        };
+
+        data->nodeCount++;
+    }
+    
     return false;
-}
-
-
-static bool wlArrayRealloc(wl_array* arr, size_t size) {
-    size_t alloc;
-    if (arr->alloc > 0 && size > arr->alloc / 4) {
-        alloc = arr->alloc;
-    } else {
-        alloc = 16;
-    }
-
-    while (alloc < size) {
-        alloc *= 2;
-    }
-
-    if (alloc == arr->alloc) {
-        return true;
-    }
-
-
-    void* data = realloc(arr->data, alloc);
-    if (data == nullptr) {
-        return false;
-    }
-
-    arr->data = data;
-    arr->alloc = alloc;
-    return true;
 }
 
 
@@ -289,16 +252,12 @@ static void transformOutputDamage(pixman_region32_t* damage, const RenderData* d
 static void outputStateApplyDamage(const RenderData* data, wlr_output_state* state) {
     Output* output = data->output;
 
-    pixman::Region32 frameDamage;
-    pixman_region32_copy(frameDamage.raw(), &output->wlrDamageRing.current);
+    pixman::Region32 frameDamage = &output->wlrDamageRing.current;
     transformOutputDamage(frameDamage.raw(), data);
-    pixman_region32_union(
-        &output->pendingCommitDamage, 
-        &output->pendingCommitDamage, 
-        frameDamage.raw()
-    );
 
-    wlr_output_state_set_damage(state, &output->pendingCommitDamage);
+    output->pendingCommitDamage += frameDamage;
+
+    wlr_output_state_set_damage(state, output->pendingCommitDamage.raw());
 }
 
 
@@ -325,7 +284,7 @@ static void scaleOutputDamage(pixman_region32_t* damage, float scale) {
 }
 
 
-static void sceneEntryRender(RenderListEntry& entry, const RenderData& data) {
+static void sceneEntryRender(Output::RenderListEntry& entry, const RenderData& data) {
 
     const auto scaleLength = [] (int length, int offset, float scale) {
         return round((offset + length) * scale) - round(offset * scale);
@@ -333,12 +292,11 @@ static void sceneEntryRender(RenderListEntry& entry, const RenderData& data) {
 
     SceneNode* node = entry.node;
     
-    pixman::Region32 renderRegion;
-    pixman_region32_copy(renderRegion.raw(), &node->visibleArea);
+    pixman::Region32 renderRegion = node->visibleArea;
     pixman_region32_translate(renderRegion.raw(), -data.logical.x, -data.logical.y);
     scaleOutputDamage(renderRegion.raw(), data.scale);
     pixman_region32_intersect(renderRegion.raw(), renderRegion.raw(), &data.damage);
-    if (renderRegion.empty()) {
+    if (renderRegion.empty() && false) { // todo
         return;
     }
 
@@ -390,14 +348,16 @@ static void sceneEntryRender(RenderListEntry& entry, const RenderData& data) {
             options.src_box = buf->srcBox;
             options.dst_box = dstBox;
             options.transform = bufTransform;
-            options.clip = renderRegion.raw();
+            options.clip = nullptr; // todo : renderRegion.raw();
             options.filter_mode = WLR_SCALE_FILTER_BILINEAR;
             options.alpha = &buf->opacity;
 
-            if (opaque.empty()) {
+            if (true) {
                 options.blend_mode = WLR_RENDER_BLEND_MODE_PREMULTIPLIED;
-            } else {
+            } else /* todo : 强制启用 premultiplied */ if (opaque.empty()) {
                 options.blend_mode = WLR_RENDER_BLEND_MODE_NONE;
+            } else {
+                options.blend_mode = WLR_RENDER_BLEND_MODE_PREMULTIPLIED;
             }
             
             wlr_render_pass_add_texture(data.wlrRenderPass, &options);
@@ -483,18 +443,14 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
     RenderListConstructorData listCon = {
         .box = renderData.logical,
         .renderList = &this->renderList,
-        .calculateVisibility = this->scene->calculateVisibility
+        .calculateVisibility = this->scene->calculateVisibility,
+        .nodeCount = 0
     };
 
-    listCon.renderList->size = 0;
-    this->scene->tree->nodesInBox(&listCon.box, constructRenderListIterator, &listCon);
-    wlArrayRealloc(listCon.renderList, listCon.renderList->size);
 
-    RenderListEntry* listData = (RenderListEntry*) listCon.renderList->data;
-    int listLen = listCon.renderList->size / sizeof(*listData);
+    this->scene->tree->nodesInBox(&listCon.box, constructRenderListIterator, &listCon);
 
     outputStateApplyDamage(&renderData, state);
-
 
     wlr_damage_ring_set_bounds(&wlrDamageRing, renderData.transWidth, renderData.transHeight);
     if (!wlr_output_configure_primary_swapchain(wlrOutput, state, &wlrOutput->swapchain)) {
@@ -518,6 +474,7 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
     auto bufRenderPassOptions = (wlr_buffer_pass_options) {
         .timer = timer ? timer->wlrRenderTimer : nullptr
     };
+
     wlr_render_pass* renderPass = wlr_renderer_begin_buffer_pass(
         wlrOutput->renderer, buffer, &bufRenderPassOptions
     );
@@ -532,16 +489,15 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
     pixman_region32_init(&renderData.damage);
     wlr_damage_ring_rotate_buffer(&wlrDamageRing, buffer, &renderData.damage);
 
-    pixman::Region32 background;
-    pixman_region32_copy(background.raw(), &renderData.damage);
+    pixman::Region32 background = renderData.damage;
 
     if (this->scene->calculateVisibility) {
-        for (int i = listLen - 1; i >= 0; i--) {
-            RenderListEntry& entry = listData[i];
+        for (int i = listCon.nodeCount - 1; i >= 0; i--) {
+            RenderListEntry& entry = (*listCon.renderList)[i];
 
             pixman::Region32 opaque;
             entry.node->opaqueRegion(entry.x, entry.y, opaque.raw());
-            pixman_region32_intersect(opaque.raw(), opaque.raw(), &entry.node->visibleArea);
+            pixman_region32_intersect(opaque.raw(), opaque.raw(), entry.node->visibleArea.raw());
 
             pixman_region32_translate(opaque.raw(), -position.x, -position.y);
             wlr_region_scale(opaque.raw(), opaque.raw(), renderData.scale);
@@ -555,6 +511,7 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
     }
 
     transformOutputDamage(background.raw(), &renderData);
+
 
     // 桌面背景
     
@@ -572,10 +529,15 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
     };
     wlr_render_pass_add_rect(renderPass, &backgroundRenderRectOptions);
 
-    for (int i = listLen - 1; i >= 0; i--) {
-        RenderListEntry& entry = listData[i];
+
+    // 渲染每个 view
+    
+    for (int i = listCon.nodeCount - 1; i >= 0; i--) {
+        RenderListEntry& entry = (*listCon.renderList)[i];
         sceneEntryRender(entry, renderData);
         
+        // 发送 dmabuf 信息
+
         if (entry.node->type() == SceneNodeType::BUFFER) {
             auto* buf = (SceneBufferNode*) entry.node;
             if (buf->primaryOutput == this && !entry.sentDmaBufFeedback) {
@@ -589,7 +551,7 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
         }
     }
 
-    //wlr_output_add_software_cursors_to_render_pass(wlrOutput, renderPass, &renderData.damage);
+    wlr_output_add_software_cursors_to_render_pass(wlrOutput, renderPass, &renderData.damage);
 
     pixman_region32_fini(&renderData.damage);
 
@@ -598,49 +560,6 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
         wlr_damage_ring_add_whole(&wlrDamageRing);
         return false;
     }
-
-    
-
-
-
-
-#if 0
-wlr_renderer* pixmanRenderer = wlrOutput->renderer;
-pixman_image_t* img = wlr_pixman_renderer_get_buffer_image(pixmanRenderer, buffer);
-int width = pixman_image_get_width(img);
-int height = pixman_image_get_height(img);
-int stride = pixman_image_get_stride(img);
-int depth = pixman_image_get_depth(img);
-pixman_format_code_t fmt = pixman_image_get_format(img);
-uint32_t* imgData = pixman_image_get_data(img);
-
-static int __photoId = -1;
-__photoId++;
-string fname = std::to_string(__photoId);
-fname += ".jpg";
-fname = "./" + fname;
-FILE* outfile = fopen(fname.c_str(), "wb");
-jpeg_compress_struct cinfo;
-jpeg_error_mgr jerr;
-cinfo.err = jpeg_std_error(&jerr);
-jpeg_create_compress(&cinfo);
-jpeg_stdio_dest(&cinfo, outfile);
-cinfo.image_width = width;
-cinfo.image_height = height;
-cinfo.in_color_space = JCS_EXT_BGRX;
-cinfo.input_components = 4;
-jpeg_set_defaults(&cinfo);
-jpeg_start_compress(&cinfo, TRUE);
-int i = 0;
-while (cinfo.next_scanline < cinfo.image_height) {
-    unsigned char* linePtr = (unsigned char*) imgData;
-    linePtr += i * cinfo.image_width * cinfo.input_components;
-    jpeg_write_scanlines(&cinfo, &linePtr, 1);
-    i++;
-}
-jpeg_finish_compress(&cinfo);
-jpeg_destroy_compress(&cinfo);
-#endif
 
 
     wlr_output_state_set_buffer(state, buffer);
@@ -655,7 +574,7 @@ void Output::sendFrameDone(timespec* now) {
 }
 
 
-void Output::destroy() {
+Output::~Output() {
 
     wl_signal_emit_mutable(&events.destroy, nullptr);
 
@@ -665,15 +584,12 @@ void Output::destroy() {
 
     wlr_addon_finish(&this->addon);
     wlr_damage_ring_finish(&wlrDamageRing);
-    
-    pixman_region32_fini(&pendingCommitDamage);
 
     wl_list_remove(&link);
     wl_list_remove(&eventListeners.outputCommit.link);
     wl_list_remove(&eventListeners.outputDamage.link);
     wl_list_remove(&eventListeners.outputNeedsFrame.link);
 
-    wl_array_release(&this->renderList);
 }
 
 }

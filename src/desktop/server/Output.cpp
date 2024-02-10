@@ -52,10 +52,12 @@ static void destroyEventBridge(wl_listener* listener, void* data) {
     wl_display_terminate(server->wlDisplay);
 }
 
-int Output::init(Server* server, wlr_output* output) {
+VESPER_OBJ_UTILS_IMPL_CREATE(Output, Output::CreateOptions);
 
-    this->server = server;
-    this->wlrOutput = output;
+int Output::init(const CreateOptions& options) {
+
+    this->server = options.server;
+    this->wlrOutput = options.wlrOutput;
 
     eventListeners.frame.notify = frameEventBridge;
     wl_signal_add(&wlrOutput->events.frame, &eventListeners.frame);
@@ -66,13 +68,13 @@ int Output::init(Server* server, wlr_output* output) {
     eventListeners.destroy.notify = destroyEventBridge;
     wl_signal_add(&wlrOutput->events.destroy, &eventListeners.destroy);
 
-    wl_list_insert(&server->wlOutputs, &link);
+    wl_list_insert(&server->outputs, &link);
 
     wlr_output_layout_output* layoutOutput = wlr_output_layout_add_auto(
         server->wlrOutputLayout, wlrOutput
     );
 
-    scene::Output* sceneOutput = scene::Output::create(server->scene, output);
+    scene::Output* sceneOutput = scene::Output::create(server->scene, wlrOutput);
     if (sceneOutput == nullptr) {
         LOG_ERROR("failed to create scene output!");
         return -1;

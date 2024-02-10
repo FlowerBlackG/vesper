@@ -10,9 +10,14 @@
 
 #include "../../utils/wlroots-cpp.h"
 
+#include "../../bindings/pixman.h"
+
+#include <vector>
+
 namespace vesper::desktop::scene {
 
 class Scene;
+class SceneNode;
 class RenderTimer;
 
 
@@ -39,7 +44,7 @@ public:
     void sendFrameDone(timespec* now);
 
 public:
-    void destroy();
+    ~Output();
 
 public:
     wlr_output* wlrOutput;
@@ -68,17 +73,23 @@ public:
         wl_listener outputNeedsFrame;
     } eventListeners;
 
-
+    /** 屏幕（或虚拟屏幕）在所有屏幕组成的布局中的位置。 */
     struct {
         int x;
         int y;
     } position;
 
-    pixman_region32_t pendingCommitDamage;
+    vesper::bindings::pixman::Region32 pendingCommitDamage;
 
     uint8_t index;
 
-    wl_array renderList;
+    struct RenderListEntry {
+        SceneNode* node;
+        bool sentDmaBufFeedback;
+        int x, y;
+    };
+
+    std::vector<RenderListEntry> renderList;
 
 }; // class Output
 

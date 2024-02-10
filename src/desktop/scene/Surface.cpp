@@ -79,7 +79,6 @@ static void surfaceFrameDoneEventBridge (wl_listener* listener, void* data) {
 static void surfaceSurfaceDestroyEventBridge (wl_listener* listener, void* data) {
     Surface* surface = wl_container_of(listener, surface, eventListeners.surfaceDestroy);
     
-    surface->buffer->destroy();
     delete surface->buffer;
     surface->buffer = nullptr;
 }
@@ -149,9 +148,15 @@ int Surface::init(SceneTreeNode* parent, wlr_surface* wlrSurface) {
     }
 
     this->wlrSurface = wlrSurface;
+    this->buffer->pointAcceptsInput = [] (SceneBufferNode* buf, double* sx, double* sy) {
+        Surface* surface = Surface::tryFindSurfaceFromBuffer(buf);
 
-    // todo: scene_buffer->point_accepts_input = scene_buffer_point_accepts_input
+        *sx += surface->clip.x;
+        *sy += surface->clip.y;
 
+        return wlr_surface_point_accepts_input(surface->wlrSurface, *sx, *sy);
+    };
+    
     this->eventListeners.outputsUpdate.notify = surfaceOutputsUpdateEventBridge;
     wl_signal_add(&buffer->events.outputsUpdate, &eventListeners.outputsUpdate);
 
@@ -188,8 +193,7 @@ void Surface::reconfigure() {
     wlr_fbox srcBox;
     wlr_surface_get_buffer_source_box(surface, &srcBox);
 
-    pixman::Region32 opaque;
-    pixman_region32_copy(opaque.raw(), &surface->opaque_region);
+    pixman::Region32 opaque = surface->opaque_region;
 
     int width = state->width;
     int height = state->height;
@@ -303,7 +307,7 @@ wlr_addon_interface sceneSubSurfaceTreeSurfaceAddonImpl = {
 
 static void subSurfaceTreeSurfaceDestroyEventBridge(wl_listener* listener, void* data) {
     SubSurfaceTree* tree = wl_container_of(listener, tree, eventListeners.surfaceDestroy);
-    tree->tree->destroy();
+   
     delete tree->tree;
     tree->tree = nullptr;
 }
@@ -346,9 +350,9 @@ static void subSurfaceTreeSubSurfaceDestroyEventBridge(wl_listener* listener, vo
         listener, tree, eventListeners.subsurfaceDestroy
     );
 
-    tree->tree->destroy();
-    delete tree->tree;
-    tree->tree = nullptr;
+    auto* sceneTree = tree->tree;
+
+    delete sceneTree;
 }
 
 
@@ -379,7 +383,7 @@ int SubSurfaceTree::init(SceneTreeNode* parent, wlr_surface* wlrSurface) {
 
     this->sceneSurface = Surface::create(this->tree, wlrSurface);
     if (this->sceneSurface == nullptr) {
-        this->tree->destroy();
+       
         delete this->tree;
         return -2;
     }
@@ -391,7 +395,7 @@ int SubSurfaceTree::init(SceneTreeNode* parent, wlr_surface* wlrSurface) {
         wlrSubSurface, &wlrSurface->current.subsurfaces_below, current.link
     ) {
         if (!this->createSubSurface(wlrSubSurface)) {
-            this->tree->destroy();
+           
             delete this->tree;
             return -3;
         }
@@ -401,7 +405,7 @@ int SubSurfaceTree::init(SceneTreeNode* parent, wlr_surface* wlrSurface) {
         wlrSubSurface, &wlrSurface->current.subsurfaces_above, current.link
     ) {
         if (!this->createSubSurface(wlrSubSurface)) {
-            this->tree->destroy();
+     
             delete this->tree;
             return -4;
         }

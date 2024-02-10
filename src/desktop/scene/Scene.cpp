@@ -32,11 +32,8 @@ static void linuxDmaBufV1DestroyEventBridge(wl_listener* listener, void* data) {
 
 Scene* Scene::create() {
     Scene* scene = new (nothrow) Scene;
-    if (!scene) {
-        return nullptr;
-    }
 
-    if (scene->init()) {
+    if (scene && scene->init()) {
         delete scene;
         return nullptr;
     }
@@ -62,16 +59,13 @@ int Scene::init() {
 
 
 OutputLayout* Scene::attachWlrOutputLayout(wlr_output_layout* wlrOutputLayout) {
-    auto* outputLayout = new (nothrow) OutputLayout;
+    auto* outputLayout = OutputLayout::create({
+        .scene = this,
+        .wlrOutputLayout = wlrOutputLayout
+    });
+
     if (!outputLayout) {
         LOG_ERROR("failed to create output layout!");
-        return nullptr;
-    }
-
-    if (outputLayout->init(this, wlrOutputLayout)) {
-        delete outputLayout;
-        LOG_ERROR("failed to init output layout!");
-        return nullptr;
     }
 
     return outputLayout;
@@ -79,7 +73,6 @@ OutputLayout* Scene::attachWlrOutputLayout(wlr_output_layout* wlrOutputLayout) {
 
 void Scene::destroyTree() {
     if (tree) {
-        tree->destroy();
         delete tree;
         tree = nullptr;
     }
@@ -101,17 +94,10 @@ static bool sceneUpdateRegionNodeUpdateOnDiscover(
     wlr_box box = { .x = x, .y = y };
     node->getSize(&box.width, &box.height);
 
-    pixman_region32_subtract(
-        &node->visibleArea, &node->visibleArea, updateData->updateRegion
-    );
-    
-    pixman_region32_union(
-        &node->visibleArea, &node->visibleArea, updateData->visible
-    );
+    node->visibleArea -= updateData->updateRegion;
+    node->visibleArea += updateData->visible;
 
-    pixman_region32_intersect_rect(
-        &node->visibleArea, &node->visibleArea, x, y, box.width, box.height
-    );
+    node->visibleArea.intersectRect(node->visibleArea, box);
 
     if (updateData->calculateVisibility) {
         pixman::Region32 opaque;
@@ -121,9 +107,16 @@ static bool sceneUpdateRegionNodeUpdateOnDiscover(
         );
     }
 
-    node->updateNodeUpdateOutputs(updateData->outputs, nullptr, nullptr);
+    if (node->type() == SceneNodeType::BUFFER) {
+        ((SceneBufferNode*) node)->updateNodeUpdateOutputs(updateData->outputs, nullptr, nullptr);
+    }
 
-    return false; // 确保遍历完所有 rect 和 buffer 节点。
+    return false; // 返回 false 以保证所有子节点都被遍历到。
+}
+
+
+void Scene::updateRegion(pixman::Region32& updateRegion) {
+    this->updateRegion(updateRegion.raw());
 }
 
 

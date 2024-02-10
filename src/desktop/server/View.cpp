@@ -38,11 +38,11 @@ static void xdgToplevelUnmapEventBridge(wl_listener* listener, void* data) {
 
     View* view = wl_container_of(listener, view, eventListeners.unmap);
     LOG_TEMPORARY("xdg unmap");
-    if (view == view->server->grabbedView) {
-        view->server->grabbedView = nullptr;
+    if (view == view->server->cursor->grabbedView) {
+        view->server->cursor->grabbedView = nullptr;
 
-        view->server->cursorMode = Server::CursorMode::PASSTHROUGH;
-        view->server->grabbedView = nullptr;
+        view->server->cursor->cursorMode = Cursor::Mode::PASSTHROUGH;
+        view->server->cursor->grabbedView = nullptr;
 
     }
 
@@ -65,7 +65,7 @@ static void xdgToplevelDestroyEventBridge(wl_listener* listener, void* data) {
 
 static void xdgToplevelRequestMoveEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.requestMove);
-    view->beginInteraction(Server::CursorMode::MOVE, 0);
+    view->beginInteraction(Cursor::Mode::MOVE, 0);
 }
 
 /**
@@ -88,7 +88,7 @@ static void xdgToplevelRequestMoveEventBridge(wl_listener* listener, void* data)
 static void xdgToplevelRequestResizeEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.requestResize);
     auto* event = (wlr_xdg_toplevel_resize_event*) data;
-    view->beginInteraction(Server::CursorMode::RESIZE, event->edges);
+    view->beginInteraction(Cursor::Mode::RESIZE, event->edges);
 }
 
 static void xdgToplevelrequestMaximizeEventBridge(wl_listener* listener, void* data) {
@@ -98,7 +98,7 @@ static void xdgToplevelrequestMaximizeEventBridge(wl_listener* listener, void* d
         
         // todo: 假设仅有 1 个 output
 
-        auto outputNode = view->server->wlOutputs.next;
+        auto outputNode = view->server->outputs.next;
         Output* output = wl_container_of(outputNode, output, link);
 
         int targetHeight = output->wlrOutput->height;
@@ -120,27 +120,31 @@ static void xdgToplevelRequestFullscreenEventBridge(wl_listener* listener, void*
     }
 }
 
+VESPER_OBJ_UTILS_IMPL_CREATE(View, View::CreateOptions)
 
 
+int View::init(const CreateOptions& options) {
 
-int View::init(Server* server, wlr_xdg_toplevel* xdgToplevel) {
-
-    this->server = server;
-    this->wlrXdgToplevel = xdgToplevel;
+    this->server = options.server;
+    this->wlrXdgToplevel = options.xdgToplevel;
 
 
-    auto* xdgSurface = scene::XdgSurface::create(server->scene->tree, xdgToplevel->base);
+    auto* xdgSurface = scene::XdgSurface::create({
+        .parent = server->scene->tree,
+        .wlrXdgSurface = wlrXdgToplevel->base
+    });
+
     if (xdgSurface == nullptr) {
         LOG_ERROR("failed to create xdg surface!");
         return -1;
     }
 
     this->sceneTree = xdgSurface->tree;
-LOG_TEMPORARY("sceneTree at: ", this->sceneTree);
+    
     this->sceneTree->data = this;
-    xdgToplevel->base->data = this->sceneTree;
+    wlrXdgToplevel->base->data = this->sceneTree;
 
-    auto* wlrXdgSurface = xdgToplevel->base;
+    auto* wlrXdgSurface = wlrXdgToplevel->base;
 
     eventListeners.map.notify = xdgToplevelMapEventBridge;
     wl_signal_add(&wlrXdgSurface->surface->events.map, &eventListeners.map);
@@ -186,6 +190,8 @@ void View::focus(wlr_surface* surface) {
     auto* keyboard = wlr_seat_get_keyboard(seat);
 
     this->sceneTree->raiseToTop();
+    wl_list_remove(&this->link);
+    wl_list_insert(&server->views, &this->link);
 
     wlr_xdg_toplevel_set_activated(this->wlrXdgToplevel, true);
 
@@ -198,18 +204,18 @@ void View::focus(wlr_surface* surface) {
 
 }
 
-void View::beginInteraction(Server::CursorMode cursorMode, uint32_t edges) {
+void View::beginInteraction(Cursor::Mode cursorMode, uint32_t edges) { // todo : move this func to Cursor class.
     auto* focusedSurface = server->wlrSeat->pointer_state.focused_surface;
     if (wlrXdgToplevel->base->surface != wlr_surface_get_root_surface(focusedSurface)) {
         return;
     }
 
-    server->grabbedView = this;
-    server->cursorMode = cursorMode;
+    server->cursor->grabbedView = this;
+    server->cursor->cursorMode = cursorMode;
 
-    if (cursorMode == Server::CursorMode::MOVE) {
-        server->grabX = server->wlrCursor->x - sceneTree->offset.x;
-        server->grabY = server->wlrCursor->y - sceneTree->offset.y;
+    if (cursorMode == Cursor::Mode::MOVE) {
+        server->cursor->grabX = server->cursor->wlrCursor->x - sceneTree->offset.x;
+        server->cursor->grabY = server->cursor->wlrCursor->y - sceneTree->offset.y;
     } else { // resize
         
         wlr_box geoBox;
@@ -221,14 +227,14 @@ void View::beginInteraction(Server::CursorMode cursorMode, uint32_t edges) {
         double borderY = sceneTree->offset.y + geoBox.y;
         borderY += ((edges & WLR_EDGE_BOTTOM) ? geoBox.height : 0);
 
-        server->grabX = server->wlrCursor->x - borderX;
-        server->grabY = server->wlrCursor->y - borderY;
+        server->cursor->grabX = server->cursor->wlrCursor->x - borderX;
+        server->cursor->grabY = server->cursor->wlrCursor->y - borderY;
 
-        server->grabGeoBox = geoBox;
-        server->grabGeoBox.x += sceneTree->offset.x;
-        server->grabGeoBox.y += sceneTree->offset.y;
+        server->cursor->grabGeoBox = geoBox;
+        server->cursor->grabGeoBox.x += sceneTree->offset.x;
+        server->cursor->grabGeoBox.y += sceneTree->offset.y;
 
-        server->resizeEdges = edges;
+        server->cursor->resizeEdges = edges;
     }
     
 }

@@ -21,13 +21,11 @@ namespace vesper::desktop::scene {
 
 static void outputLayoutLayoutDestroyEventBridge(wl_listener* listener, void* data) {
     OutputLayout* obj = wl_container_of(listener, obj, eventListeners.layoutDestroy);
-    obj->destroy();
     delete obj;
 }
 
 static void outputLayoutSceneDestroyEventBridge(wl_listener* listener, void* data) {
     OutputLayout* obj = wl_container_of(listener, obj, eventListeners.sceneDestroy);
-    obj->destroy();
     delete obj;
 }
 
@@ -43,17 +41,19 @@ static void outputLayoutLayoutChangeEventBridge(wl_listener* listener, void* dat
     }
 }
 
-int OutputLayout::init(Scene* scene, wlr_output_layout* wlrOutputLayout) {
-    this->scene = scene;
-    this->wlrLayout = wlrOutputLayout;
+VESPER_OBJ_UTILS_IMPL_CREATE(OutputLayout, OutputLayout::CreateOptions)
+
+int OutputLayout::init(const CreateOptions& options) {
+    this->scene = options.scene;
+    this->wlrLayout = options.wlrOutputLayout;
 
     wl_list_init(&outputs);
 
     eventListeners.layoutDestroy.notify = outputLayoutLayoutDestroyEventBridge;
-    wl_signal_add(&wlrOutputLayout->events.destroy, &eventListeners.layoutDestroy);
+    wl_signal_add(&wlrLayout->events.destroy, &eventListeners.layoutDestroy);
 
     eventListeners.layoutChange.notify = outputLayoutLayoutChangeEventBridge;
-    wl_signal_add(&wlrOutputLayout->events.change, &eventListeners.layoutChange);
+    wl_signal_add(&wlrLayout->events.change, &eventListeners.layoutChange);
     
     eventListeners.sceneDestroy.notify = outputLayoutSceneDestroyEventBridge;
     wl_signal_add(&scene->tree->basicEvents.destroy, &eventListeners.sceneDestroy);
@@ -62,10 +62,9 @@ int OutputLayout::init(Scene* scene, wlr_output_layout* wlrOutputLayout) {
 
 }
 
-void OutputLayout::destroy() {
+OutputLayout::~OutputLayout() {
     OutputLayoutOutput *obj, *tmp;
     wl_list_for_each_safe(obj, tmp, &outputs, link) {
-        obj->destroy();
         delete obj;
     }
 
@@ -86,7 +85,12 @@ int OutputLayout::addOutput(
         }
     }
 
-    olo = OutputLayoutOutput::create(sceneOutput, wlrLayoutOutput, this);
+    olo = OutputLayoutOutput::create({
+        .sceneOutput = sceneOutput,
+        .wlrLayoutOutput = wlrLayoutOutput,
+        .outputLayout = this
+    });
+
     if (!olo) {
         LOG_ERROR("failed to create scene output layout output!");
         return -1;
@@ -107,7 +111,6 @@ static void layoutOutputDestroyEventBridge(wl_listener* listener, void* data) {
         listener, olo, eventListeners.layoutOutputDestroy
     );
 
-    olo->destroy();
     delete olo;
 }
 
@@ -117,32 +120,14 @@ static void sceneOutputDestroyEventBridge(wl_listener* listener, void* data) {
         listener, olo, eventListeners.sceneOutputDestroy
     );
 
-    olo->destroy();
     delete olo;
 }
 
+VESPER_OBJ_UTILS_IMPL_CREATE(OutputLayoutOutput, OutputLayoutOutput::CreateOptions)
 
-OutputLayoutOutput* OutputLayoutOutput::create(
-    Output* sceneOutput, wlr_output_layout_output* wlrLayoutOutput, OutputLayout* outputLayout
-) {
-    auto* p = new (nothrow) OutputLayoutOutput;
-    if (!p) {
-        return nullptr;
-    }
-
-    if (p->init(sceneOutput, wlrLayoutOutput, outputLayout)) {
-        delete p;
-        return nullptr;
-    }
-
-    return p;
-}
-
-int OutputLayoutOutput::init(
-    Output* sceneOutput, wlr_output_layout_output* wlrLayoutOutput, OutputLayout* outputLayout
-) {
-    this->sceneOutput = sceneOutput;
-    this->wlrLayoutOutput = wlrLayoutOutput;
+int OutputLayoutOutput::init(const CreateOptions& options) {
+    this->sceneOutput = options.sceneOutput;
+    this->wlrLayoutOutput = options.wlrLayoutOutput;
 
     this->eventListeners.layoutOutputDestroy.notify = layoutOutputDestroyEventBridge;
     wl_signal_add(&wlrLayoutOutput->events.destroy, &eventListeners.layoutOutputDestroy);
@@ -150,7 +135,7 @@ int OutputLayoutOutput::init(
     this->eventListeners.sceneOutputDestroy.notify = sceneOutputDestroyEventBridge;
     wl_signal_add(&sceneOutput->events.destroy, &eventListeners.sceneOutputDestroy);
     
-    wl_list_insert(&outputLayout->outputs, &this->link);
+    wl_list_insert(&options.outputLayout->outputs, &this->link);
 
     sceneOutput->setPosition(wlrLayoutOutput->x, wlrLayoutOutput->y);
 
@@ -158,7 +143,7 @@ int OutputLayoutOutput::init(
 }
     
 
-void OutputLayoutOutput::destroy() {
+OutputLayoutOutput::~OutputLayoutOutput() {
     wl_list_remove(&eventListeners.layoutOutputDestroy.link);
     wl_list_remove(&eventListeners.sceneOutputDestroy.link);
     wl_list_remove(&link);

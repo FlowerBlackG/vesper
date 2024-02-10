@@ -16,6 +16,21 @@ Region32::Region32() {
 }
 
 
+Region32::Region32(const Region32& src) {
+    pixman_region32_init(raw());
+    pixman_region32_copy(raw(), src.raw());
+}
+
+Region32::Region32(pixman_region32_t* cObj) {
+    pixman_region32_init(raw());
+    pixman_region32_copy(raw(), cObj);
+}
+
+Region32::Region32(pixman_region32_t& cObj) {
+    pixman_region32_init(raw());
+    pixman_region32_copy(raw(), &cObj);
+}
+
 Region32::~Region32() {
     pixman_region32_fini(raw());
 }
@@ -101,6 +116,53 @@ uint32_t Region32::regionArea() {
     }
 
     return area;
+}
+
+Region32& Region32::operator -= (const Region32& other) {
+    pixman_region32_subtract(raw(), raw(), other.raw());
+    return *this;    
+}
+
+
+Region32& Region32::operator -= (const pixman_region32_t* other) {
+    pixman_region32_subtract(raw(), raw(), other);
+    return *this;    
+}
+
+Region32& Region32::operator -= (const pixman_region32_t& other) {
+    pixman_region32_subtract(raw(), raw(), &other);
+    return *this;    
+}
+
+Region32& Region32::operator += (const Region32& other) {
+    pixman_region32_union(raw(), raw(), other.raw());
+    return *this;
+}
+
+
+Region32& Region32::operator += (const pixman_region32_t* other) {
+    pixman_region32_union(raw(), raw(), other);
+    return *this;
+}
+
+Region32& Region32::operator += (const pixman_region32_t& other) {
+    pixman_region32_union(raw(), raw(), &other);
+    return *this;
+}
+
+
+bool Region32::operator == (const Region32& other) const {
+    return pixman_region32_equal(raw(), other.raw());    
+}
+
+
+bool Region32::operator == (const pixman_region32_t* other) const {
+    return pixman_region32_equal(raw(), other);    
+}
+
+
+bool Region32::operator == (const pixman_region32_t& other) const {
+    return pixman_region32_equal(raw(), &other);    
 }
 
 
