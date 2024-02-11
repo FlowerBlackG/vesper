@@ -25,8 +25,15 @@ class Output {
 
 public:
 
-    static Output* create(Scene* scene, wlr_output* wlrOutput);
-    int init(Scene* scene, wlr_output* wlrOutput);
+    struct CreateOptions {
+        Scene* scene;
+        wlr_output* wlrOutput;
+        bool alwaysRenderEntireScreen;
+        bool exportScreenBuffer;
+        void* exportScreenBufferDest;
+    };
+
+    static Output* create(const CreateOptions&);
 
     void setPosition(int x, int y);
     void updateGeometry(bool forceUpdate);
@@ -46,7 +53,15 @@ public:
 public:
     ~Output();
 
+protected:
+    int init(const CreateOptions&);
+
 public:
+
+    bool alwaysRenderEntireScreen;
+    bool exportScreenBuffer;
+    void* exportScreenBufferDest;
+
     wlr_output* wlrOutput;
 
     /**

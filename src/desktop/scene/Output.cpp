@@ -13,9 +13,10 @@
 #include "./RenderData.h"
 
 #include "../../log/Log.h"
+#include "../../utils/ObjUtils.h"
 
 #include "../../bindings/pixman/Region32.h"
-#include <jpeglib.h>
+
 using namespace std;
 using namespace vesper::bindings;
 
@@ -77,21 +78,16 @@ wlr_addon_interface sceneOutputAddonImpl = {
 };
 
 
-Output* Output::create(Scene* scene, wlr_output* wlrOutput) {
-    auto* p = new (nothrow) Output;
-
-    if (p && p->init(scene, wlrOutput)) {
-        delete p;
-        return nullptr;
-    }
-
-    return p;
-}
+VESPER_OBJ_UTILS_IMPL_CREATE(Output, Output::CreateOptions)
 
 
-int Output::init(Scene* scene, wlr_output* wlrOutput) {
-    this->wlrOutput = wlrOutput;
-    this->scene = scene;
+int Output::init(const CreateOptions& options) {
+    this->wlrOutput = options.wlrOutput;
+    this->scene = options.scene;
+
+    this->alwaysRenderEntireScreen = options.alwaysRenderEntireScreen;
+    this->exportScreenBuffer = options.exportScreenBuffer;
+    this->exportScreenBufferDest = options.exportScreenBufferDest;
 
     wlr_addon_init(&this->addon, &wlrOutput->addons, scene, &sceneOutputAddonImpl);
     
@@ -198,7 +194,7 @@ struct RenderListConstructorData {
     wlr_box box;
     std::vector<Output::RenderListEntry>* renderList;
     bool calculateVisibility;
-    int nodeCount;
+    size_t nodeCount;
 };
 
 
@@ -374,7 +370,9 @@ static void sceneEntryRender(Output::RenderListEntry& entry, const RenderData& d
 
 bool Output::buildState(wlr_output_state* state, StateOptions* options) {
 
-    this->updateGeometry(true); // todo
+    if (alwaysRenderEntireScreen) {
+        this->updateGeometry(true);
+    }
 
     StateOptions defaultOptions = {
         .timer = nullptr
@@ -563,6 +561,39 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
 
 
     wlr_output_state_set_buffer(state, buffer);
+
+    while (exportScreenBuffer) { // 用 while 是为了让内部可以直接用 break 提前跳出。
+        pixman_image_t* img = wlr_pixman_renderer_get_buffer_image(
+            this->wlrOutput->renderer, buffer
+        );
+
+        if (img == nullptr) {
+            LOG_ERROR("cannot get screen buffer!");
+            break;
+        }
+
+        auto imgWidth = pixman_image_get_width(img);
+        auto imgHeight = pixman_image_get_height(img);
+        auto imgFormat = pixman_image_get_format(img);
+        auto imgStride = pixman_image_get_stride(img);
+        auto imgData = pixman_image_get_data(img);
+
+        if (1)
+        memcpy(exportScreenBufferDest, imgData, 1280*720*4); // todo
+        else for (int i = 0; i < 720; i++) {
+            for (int j = 0; j < 1280; j++) {
+                auto pix = imgData[i * 1280 + j];
+                char* data = ((char*) exportScreenBufferDest) + 4 * (i * 1280 + j);
+                data[3] = 0;
+                data[2] = pix & 0xFF;
+                data[1] = (pix >> 8) & 0xFF;
+                data[0] = (pix >> 16) & 0xFF;
+            }
+        }
+
+        break;
+    }
+
     wlr_buffer_unlock(buffer);
 
     return true;

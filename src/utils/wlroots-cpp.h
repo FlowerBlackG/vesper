@@ -40,6 +40,8 @@ extern "C" {
 
     #include <wlr/backend.h>
     
+    #include <wlr/render/pixman.h>
+    
     #include <wlr/render/wlr_renderer.h>
     #include <wlr/render/allocator.h>
     #include <wlr/render/swapchain.h>
@@ -49,7 +51,7 @@ extern "C" {
     #include <wlr/util/log.h>
 
     #include <wlr/backend/headless.h>
-    #include <wlr/render/pixman.h>
+    #include <wlr/backend/session.h>
 
 #undef static
 }

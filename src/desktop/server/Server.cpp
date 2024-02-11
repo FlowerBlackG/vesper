@@ -158,35 +158,58 @@ static void requestSetSelectionEventBridge(wl_listener* listener, void* data) {
     // todo
 }
 
-Server::Server() {
-
-}
-
 Server::~Server() {
     
 }
 
+static void clearRunOptionsResult(Server::RunOptions& options) {
+    
+    auto& res = options.result;
+    res.msg.clear();
+    res.failedApps.clear();
+
+    res.serverLaunchedSignal.try_acquire();
+}
+
 int Server::run() {
+    
+    clearRunOptionsResult(options);
 
     this->wlDisplay = wl_display_create();
     auto waylandEventLoop = wl_display_get_event_loop(wlDisplay);
     
-    bool headless = false; // todo
-    if (headless) {
+    // backend
+    
+    if (options.backend.headless) {
         this->wlrBackend = wlr_headless_backend_create(waylandEventLoop);
+        if (this->wlrBackend && options.backend.virtualOutput.add) {
+            wlr_headless_add_output(
+                wlrBackend,
+                options.backend.virtualOutput.width, 
+                options.backend.virtualOutput.height
+            );
+        }
     } else {
         this->wlrBackend = wlr_backend_autocreate(waylandEventLoop, nullptr);
     }
 
     if (!wlrBackend) {
         LOG_ERROR("failed to create wlroots backend!");
+        options.result.code = -1;
         return -1;
     }
 
-    // todo
-    this->wlrRenderer = 0 ? wlr_renderer_autocreate(wlrBackend) : wlr_pixman_renderer_create();
+    // renderer
+
+    if (options.renderer.pixman) {
+        this->wlrRenderer = wlr_pixman_renderer_create();
+    } else {
+        this->wlrRenderer = wlr_renderer_autocreate(wlrBackend);
+    }
+    
     if (!wlrRenderer) {
         LOG_ERROR("failed to create wlroots renderer!");
+        options.result.code = -1;
         return -1;
     }
 
@@ -195,6 +218,7 @@ int Server::run() {
     wlrAllocator = wlr_allocator_autocreate(wlrBackend, wlrRenderer);
     if (!wlrAllocator) {
         LOG_ERROR("failed to create wlroots allocator!");
+        options.result.code = -1;
         return -1;
     }
 
@@ -209,22 +233,26 @@ int Server::run() {
     eventListeners.newOutput.notify = newOutputEventBridge; 
     wl_signal_add(&wlrBackend->events.new_output, &eventListeners.newOutput);
 
+    // scene
+
     scene = vesper::desktop::scene::Scene::create();
     if (!scene) {
         LOG_ERROR("failed to alloc scene!");
+        options.result.code = -1;
         return -1;
     }
     
     sceneLayout = scene->attachWlrOutputLayout(wlrOutputLayout);
     if (!sceneLayout) {
         LOG_ERROR("failed to attach wlr output layout!");
+        options.result.code = -1;
         return -1;
     }
 
     // xdg shell
     
     wl_list_init(&views);
-    wlrXdgShell = wlr_xdg_shell_create(wlDisplay, 3);
+    wlrXdgShell = wlr_xdg_shell_create(wlDisplay, 6);
     eventListeners.newXdgToplevel.notify = newXdgToplevelEventBridge;
     wl_signal_add(&wlrXdgShell->events.new_toplevel, &eventListeners.newXdgToplevel);
     eventListeners.newXdgPopup.notify = newXdgPopupEventBridge;
@@ -258,40 +286,73 @@ int Server::run() {
     if (!socket) {
         LOG_ERROR("failed to create wayland display socket!");
         wlr_backend_destroy(wlrBackend);
+        options.result.code = -1;
         return -1;
     }
 
     if (!wlr_backend_start(wlrBackend)) {
         wlr_backend_destroy(wlrBackend);
         wl_display_destroy(wlDisplay);
+        this->wlDisplay = nullptr;
         LOG_ERROR("failed to start wlr backend!");
+        options.result.code = -1;
         return -1;
     }
 
     LOG_INFO("running wayland display with socket: ", socket);
 
     setenv("WAYLAND_DISPLAY", socket, true); 
-    if (fork() == 0) {
-        execl("/bin/sh", "/bin/sh", "-c", "konsole", nullptr);
+
+    // launch apps
+
+    for (auto& it : options.launch.apps) {
+        pid_t pid = fork();
+        if (pid == 0) { // new process
+            execl("/bin/sh", "/bin/sh", "-c", it.c_str(), nullptr);
+            exit(-1);
+        } else if (pid < 0) { // failed 
+            options.result.failedApps.push_back(it);
+        }
     }
 
     LOG_INFO("server running...");
+
+    options.result.code = 0;
+    options.result.msg = "ok";
+
+    // wayland event loop
+
+    options.result.serverLaunchedSignal.release();
 
     wl_display_run(wlDisplay); // run blocking.
 
     // clean up.
 
-    wl_display_destroy_clients(wlDisplay);
-    scene->destroyTree();
-    delete scene;
-    scene = nullptr;
-    
-    delete cursor;
-    cursor = nullptr;
-
-    wl_display_destroy(wlDisplay);
+    this->clear();
 
     return 0;
+}
+
+void Server::clear() {
+
+    if (wlDisplay) {
+        wl_display_destroy_clients(wlDisplay);
+    }
+
+    if (scene) {
+        delete scene;
+        scene = nullptr;
+    }
+
+    if (cursor) {
+        delete cursor;
+        cursor = nullptr;
+    }
+
+    if (wlDisplay) {
+        wl_display_destroy(wlDisplay);
+        wlDisplay = nullptr;
+    }
 }
 
 

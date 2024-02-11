@@ -28,6 +28,8 @@ public:
      * @return nullptr if failed. 
      */
     static Scene* create();
+
+    ~Scene();
     
 
 public:
@@ -51,6 +53,7 @@ public:
 
 
 public:
+
     SceneTreeNode* tree = nullptr;
 
     /**

@@ -74,7 +74,14 @@ int Output::init(const CreateOptions& options) {
         server->wlrOutputLayout, wlrOutput
     );
 
-    scene::Output* sceneOutput = scene::Output::create(server->scene, wlrOutput);
+    scene::Output* sceneOutput = scene::Output::create({
+        .scene = server->scene,
+        .wlrOutput = wlrOutput,
+        .alwaysRenderEntireScreen = server->options.output.alwaysRenderEntireScreen,
+        .exportScreenBuffer = server->options.output.exportScreenBuffer,
+        .exportScreenBufferDest = server->options.output.exportScreenBufferDest
+    });
+    
     if (sceneOutput == nullptr) {
         LOG_ERROR("failed to create scene output!");
         return -1;

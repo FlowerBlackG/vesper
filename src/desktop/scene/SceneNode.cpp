@@ -416,8 +416,8 @@ static bool sceneNodeAtOnDiscover(SceneNode* node, int lx, int ly, void* data) {
 
 SceneNode* SceneNode::nodeAt(double lx, double ly, double* nx, double* ny) {
     wlr_box box = {
-        .x = floor(lx),
-        .y = floor(ly),
+        .x = (int) floor(lx),
+        .y = (int) floor(ly),
         .width = 1,
         .height = 1
     };

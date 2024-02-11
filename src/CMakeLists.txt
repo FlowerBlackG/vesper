@@ -30,8 +30,8 @@ configure_file(
     ${PROJECT_SOURCE_DIR}/config.h
 )
 
-# 指定使用 C++17
-set(CMAKE_CXX_STANDARD 17)
+# 指定使用 C++20
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 

@@ -41,6 +41,10 @@ Scene* Scene::create() {
     return scene;
 }
 
+Scene::~Scene() {
+    this->destroyTree();
+}
+
 int Scene::init() {
 
     tree = SceneTreeNode::create(nullptr);
