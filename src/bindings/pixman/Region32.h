@@ -21,6 +21,7 @@ public:
     Region32(const Region32& src);
     Region32(pixman_region32_t* cObj);
     Region32(pixman_region32_t& cObj);
+    Region32(const wlr_box& box);
 
     ~Region32();
 

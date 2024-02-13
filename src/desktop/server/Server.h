@@ -51,6 +51,9 @@ class Cursor;
 class Server {
 
 public:
+
+    /* ============ 对外方法 开始 ============ */
+    
     Server() {};
     ~Server();
 
@@ -84,6 +87,8 @@ public:
             
             bool exportScreenBuffer;
             void* exportScreenBufferDest;
+
+            bool forceRenderSoftwareCursor;
         } output = {0};
 
 
@@ -104,6 +109,43 @@ public:
     } options;
 
     int run();
+
+    /* ------ 运行过程中发送更新信息 ------ */
+
+    std::binary_semaphore setResolutionAsyncArgsMutex {1};
+    struct {
+        int index;
+        int width;
+        int height; 
+        int refreshRate;
+    } setResolutionAsyncArgs;
+
+    int setResolutionAsync();
+    
+    
+
+    
+    std::binary_semaphore moveCursorAsyncArgsMutex {1};
+    struct {
+        bool absolute;
+        double absoluteX;
+        double absoluteY;
+        bool delta;
+        int deltaX;
+        int deltaY;
+
+    } moveCursorAsyncArgs;
+    /**
+     * 使用前先设置在结构体内设置好数据。
+     */
+    int moveCursorAsync();
+
+    /* ============ 对外方法 结束 ============ */
+
+    /* ============ vesper desktop 模块内部使用 开始 ============ */
+
+public:
+
     void clear();
 
 public:
@@ -160,7 +202,8 @@ public:
         wl_listener requestSetCursor;
         wl_listener requestSetSelection;
     } eventListeners;
-
+    
+    /* ============ vesper desktop 模块内部使用 结尾 ============ */
 
 };
 

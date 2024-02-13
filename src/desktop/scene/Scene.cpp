@@ -150,6 +150,12 @@ void Scene::updateRegion(pixman_region32_t* updateRegion) {
 
 }
 
+
+void Scene::damageOutputs(pixman::Region32& damage) {
+    this->damageOutputs(damage.raw());
+}
+
+
 void Scene::damageOutputs(pixman_region32_t* damage) {
     if (pixman_region32_empty(damage)) {
         return;
@@ -157,17 +163,14 @@ void Scene::damageOutputs(pixman_region32_t* damage) {
 
     Output* output;
     wl_list_for_each(output, &outputs, link) {
-        pixman_region32_t outputDamage;
-        pixman_region32_init(&outputDamage);
+        pixman::Region32 outputDamage = damage;
 
-        pixman_region32_copy(&outputDamage, damage);
-        pixman_region32_translate(&outputDamage, -output->position.x, -output->position.y);
+        pixman_region32_translate(outputDamage.raw(), -output->position.x, -output->position.y);
 
-        if (wlr_damage_ring_add(&output->wlrDamageRing, &outputDamage)) {
-            wlr_output_schedule_frame(output->wlrOutput);
+        if (wlr_damage_ring_add(&output->wlrDamageRing, outputDamage.raw())) {
+            output->scheduleFrame();
         }
 
-        pixman_region32_fini(&outputDamage);
     }
 
 }

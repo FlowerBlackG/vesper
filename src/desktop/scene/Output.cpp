@@ -17,6 +17,9 @@
 
 #include "../../bindings/pixman/Region32.h"
 
+#include <semaphore>
+#include <thread>
+
 using namespace std;
 using namespace vesper::bindings;
 
@@ -55,14 +58,15 @@ static void outputDamageEventBridge(wl_listener* listener, void* data) {
     Output* output = wl_container_of(listener, output, eventListeners.outputDamage);
     auto* event = (wlr_output_event_damage*) data;
     if (wlr_damage_ring_add(&output->wlrDamageRing, event->damage)) {
-        wlr_output_schedule_frame(output->wlrOutput);
+        output->scheduleFrame();
     }
 }
 
 
 static void outputNeedsFrameEventBridge(wl_listener* listener, void* data) {
     Output* output = wl_container_of(listener, output, eventListeners.outputNeedsFrame);
-    wlr_output_schedule_frame(output->wlrOutput);
+
+    output->scheduleFrame();
 }
 
 
@@ -88,6 +92,7 @@ int Output::init(const CreateOptions& options) {
     this->alwaysRenderEntireScreen = options.alwaysRenderEntireScreen;
     this->exportScreenBuffer = options.exportScreenBuffer;
     this->exportScreenBufferDest = options.exportScreenBufferDest;
+    this->forceRenderSoftwareCursor = options.forceRenderSoftwareCursor;
 
     wlr_addon_init(&this->addon, &wlrOutput->addons, scene, &sceneOutputAddonImpl);
     
@@ -139,20 +144,46 @@ void Output::setPosition(int x, int y) {
     
 }
 
-void Output::updateGeometry(bool forceUpdate) {
+void Output::updateGeometry(bool forceUpdate, bool dontTouchTreeAndFrame) {
+    
     wlr_damage_ring_add_whole(&wlrDamageRing);
-    wlr_output_schedule_frame(wlrOutput);
-
+    
+    if (dontTouchTreeAndFrame) {
+        return;
+    }
+    
+    // then, we touch tree and frame :D
+    
     this->scene->tree->outputUpdate(
         &this->scene->outputs, 
         nullptr, 
         forceUpdate ? this : nullptr
     );
+
+    this->scheduleFrame();
+}
+
+void Output::scheduleFrame() {
+    
+    // 确保合成器提交一个新的帧。
+
+    wlr_output_update_needs_frame(wlrOutput);
+
+    if (wlrOutput->frame_pending) {
+        return;
+    }
+
+    if (!wlrOutput->frame_pending) {
+        wlr_output_send_frame(wlrOutput);
+    } else {
+        LOG_WARN("signal didn't emit. reason: frame pending");
+    }
+    
 }
 
 
 bool Output::commit(StateOptions* options) {
-
+    
     if (!wlrOutput->needs_frame && pendingCommitDamage.empty()) {
         return true;
     }
@@ -168,6 +199,7 @@ bool Output::commit(StateOptions* options) {
     bool ok = wlr_output_commit_state(this->wlrOutput, &state);
 
     wlr_output_state_finish(&state);
+
     return ok;
 }
 
@@ -368,10 +400,67 @@ static void sceneEntryRender(Output::RenderListEntry& entry, const RenderData& d
 }
 
 
+static void forceRenderSoftwareCursorToRenderPass(
+    wlr_output* output, wlr_render_pass* pass, pixman_region32_t* damage
+) {
+
+    int width, height;
+    wlr_output_transformed_resolution(output, &width, &height);
+
+    pixman::Region32 renderDamage = (wlr_box) {
+        .x = 0, .y = 0, .width = width, .height = height
+    };
+    
+    if (damage) {
+        pixman_region32_intersect(renderDamage.raw(), renderDamage.raw(), damage);
+    }
+
+    wlr_output_cursor* cursor;
+    wl_list_for_each(cursor, &output->cursors, link) {
+        if (!cursor->enabled || !cursor->visible) {
+            continue;
+        }
+
+        auto& texture = cursor->texture;
+        if (texture == nullptr) {
+            continue;
+        }
+
+        wlr_box box {
+            .x = int(cursor->x - cursor->hotspot_x),
+            .y = int(cursor->y - cursor->hotspot_y),
+            .width = int(cursor->width),
+            .height = int(cursor->height)
+        };
+
+        pixman::Region32 cursorDamage = box;
+        pixman_region32_intersect(cursorDamage.raw(), cursorDamage.raw(), renderDamage.raw());
+
+        if (cursorDamage.empty()) {
+            continue;
+        }
+
+        wl_output_transform transform = wlr_output_transform_invert(output->transform);
+        wlr_box_transform(&box, &box, transform, width, height);
+        wlr_region_transform(cursorDamage.raw(), cursorDamage.raw(), transform, width, height);
+
+        wlr_render_texture_options renderOptions = {
+            .texture = texture,
+            .src_box = cursor->src_box,
+            .dst_box = box,
+            .clip = cursorDamage.raw(),
+            .transform = output->transform
+        };
+
+        wlr_render_pass_add_texture(pass, &renderOptions);
+    }
+}
+
+
 bool Output::buildState(wlr_output_state* state, StateOptions* options) {
 
     if (alwaysRenderEntireScreen) {
-        this->updateGeometry(true);
+        this->updateGeometry(true, true);
     }
 
     StateOptions defaultOptions = {
@@ -549,7 +638,12 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
         }
     }
 
-    wlr_output_add_software_cursors_to_render_pass(wlrOutput, renderPass, &renderData.damage);
+    // software cursor 
+
+    if (this->forceRenderSoftwareCursor) {
+        forceRenderSoftwareCursorToRenderPass(wlrOutput, renderPass, &renderData.damage);
+    }
+
 
     pixman_region32_fini(&renderData.damage);
 
@@ -562,7 +656,7 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
 
     wlr_output_state_set_buffer(state, buffer);
 
-    while (exportScreenBuffer) { // 用 while 是为了让内部可以直接用 break 提前跳出。
+    if (exportScreenBuffer) do { // 用 do while (0) 是为了让内部可以直接用 break 提前跳出。
         pixman_image_t* img = wlr_pixman_renderer_get_buffer_image(
             this->wlrOutput->renderer, buffer
         );
@@ -572,27 +666,20 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
             break;
         }
 
-        auto imgWidth = pixman_image_get_width(img);
         auto imgHeight = pixman_image_get_height(img);
         auto imgFormat = pixman_image_get_format(img);
+
+        if (imgFormat != PIXMAN_a8r8g8b8 && imgFormat != PIXMAN_x8r8g8b8) {
+            LOG_ERROR("bad format: ", int64_t(imgFormat));
+            break;
+        }
+
         auto imgStride = pixman_image_get_stride(img);
         auto imgData = pixman_image_get_data(img);
 
-        if (1)
-        memcpy(exportScreenBufferDest, imgData, 1280*720*4); // todo
-        else for (int i = 0; i < 720; i++) {
-            for (int j = 0; j < 1280; j++) {
-                auto pix = imgData[i * 1280 + j];
-                char* data = ((char*) exportScreenBufferDest) + 4 * (i * 1280 + j);
-                data[3] = 0;
-                data[2] = pix & 0xFF;
-                data[1] = (pix >> 8) & 0xFF;
-                data[0] = (pix >> 16) & 0xFF;
-            }
-        }
+        memcpy(exportScreenBufferDest, imgData, imgStride * imgHeight);
 
-        break;
-    }
+    } while (false);
 
     wlr_buffer_unlock(buffer);
 

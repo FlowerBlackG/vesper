@@ -31,6 +31,10 @@ Region32::Region32(pixman_region32_t& cObj) {
     pixman_region32_copy(raw(), &cObj);
 }
 
+Region32::Region32(const wlr_box& box) {
+    pixman_region32_init_rect(raw(), box.x, box.y, box.width, box.height);
+}
+
 Region32::~Region32() {
     pixman_region32_fini(raw());
 }

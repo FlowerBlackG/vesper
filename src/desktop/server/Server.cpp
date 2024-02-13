@@ -10,6 +10,7 @@
 #include "./Server.h"
 #include "./Keyboard.h"
 #include "./Cursor.h"
+#include "./Output.h"
 
 #include "../../log/Log.h"
 #include "./View.h"
@@ -20,6 +21,7 @@
 #include "../scene/Surface.h"
 
 #include <unistd.h>
+#include <thread>
 
 using namespace std;
 using namespace vesper::desktop;
@@ -176,12 +178,12 @@ int Server::run() {
     clearRunOptionsResult(options);
 
     this->wlDisplay = wl_display_create();
-    auto waylandEventLoop = wl_display_get_event_loop(wlDisplay);
+    auto wlEventLoop = wl_display_get_event_loop(wlDisplay);
     
     // backend
     
     if (options.backend.headless) {
-        this->wlrBackend = wlr_headless_backend_create(waylandEventLoop);
+        this->wlrBackend = wlr_headless_backend_create(wlEventLoop);
         if (this->wlrBackend && options.backend.virtualOutput.add) {
             wlr_headless_add_output(
                 wlrBackend,
@@ -190,7 +192,7 @@ int Server::run() {
             );
         }
     } else {
-        this->wlrBackend = wlr_backend_autocreate(waylandEventLoop, nullptr);
+        this->wlrBackend = wlr_backend_autocreate(wlEventLoop, nullptr);
     }
 
     if (!wlrBackend) {
@@ -279,6 +281,10 @@ int Server::run() {
     eventListeners.requestSetSelection.notify = requestSetSelectionEventBridge;
     wl_signal_add(&wlrSeat->events.request_set_selection, &eventListeners.requestSetSelection);
 
+    if (options.backend.headless && options.backend.virtualOutput.add) {
+        uint32_t cap = WL_SEAT_CAPABILITY_POINTER;
+        wlr_seat_set_capabilities(wlrSeat, cap);
+    }
 
     // socket for Wayland display.
 
@@ -353,6 +359,11 @@ void Server::clear() {
         wl_display_destroy(wlDisplay);
         wlDisplay = nullptr;
     }
+
+    if (wlrSeat) {
+        wlr_seat_destroy(wlrSeat);
+        wlrSeat = nullptr;
+    }
 }
 
 
@@ -410,6 +421,92 @@ View* Server::desktopViewAt(
     }
 
     return (View*) tree->data;
+}
+
+
+static int setResolutionAsyncCommandHandler(void* data) {
+    Server* server = wl_container_of(data, server, setResolutionAsyncArgs);
+
+    auto& args = server->setResolutionAsyncArgs;
+
+    server->setResolutionAsyncArgsMutex.acquire();
+
+    int currIdx = 0;
+    int resCode = -1;
+    Output* output;
+    wl_list_for_each(output, &server->outputs, link) {
+        if (args.index == currIdx++) {
+            wlr_output_state state;
+            wlr_output_state_init(&state);
+            wlr_output_state_set_custom_mode(&state, args.width, args.height, args.refreshRate);
+            
+            if (wlr_output_commit_state(output->wlrOutput, &state)) {
+                resCode = 0;
+            }
+
+            break;
+        }
+    }
+    
+    server->setResolutionAsyncArgsMutex.release();
+
+    return 0;
+}
+
+
+int Server::setResolutionAsync() {
+    wl_event_source* event = wl_event_loop_add_timer(
+        wl_display_get_event_loop(wlDisplay), 
+        setResolutionAsyncCommandHandler, 
+        &setResolutionAsyncArgs
+    );
+
+    return wl_event_source_timer_update(event, 1);
+
+    return 0;
+}
+
+
+static int moveCursorAsyncCommandHandler(void* data) {
+    Server* server = wl_container_of(data, server, moveCursorAsyncArgs);
+    
+    auto& cursor = server->cursor;
+    auto& args = server->moveCursorAsyncArgs;
+
+    server->moveCursorAsyncArgsMutex.acquire();
+
+    timespec currTime;
+    clock_gettime(CLOCK_MONOTONIC, &currTime);
+
+    wlr_seat_pointer_notify_frame(cursor->server->wlrSeat);
+
+    wlr_cursor_warp_absolute(cursor->wlrCursor, nullptr, args.absoluteX, args.absoluteY);
+    cursor->processMotion(currTime.tv_sec / 1000 + currTime.tv_nsec / 1000000);
+
+    wlr_cursor_move(cursor->wlrCursor, nullptr, args.deltaX, args.deltaY);
+    cursor->processMotion(currTime.tv_sec / 1000 + currTime.tv_nsec / 1000000);
+
+    Output* output = wl_container_of(server->outputs.next, output, link);
+
+    scene::Output* sceneOutput = server->scene->getSceneOutput(output->wlrOutput);
+    
+    sceneOutput->updateGeometry(true);
+
+    server->moveCursorAsyncArgsMutex.release();
+
+    return 0;
+}
+
+
+int Server::moveCursorAsync() {
+
+    wl_event_source* event = wl_event_loop_add_timer(
+        wl_display_get_event_loop(wlDisplay), 
+        moveCursorAsyncCommandHandler, 
+        &moveCursorAsyncArgs
+    );
+
+    return wl_event_source_timer_update(event, 1);
 }
 
 

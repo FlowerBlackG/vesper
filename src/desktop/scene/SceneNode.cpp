@@ -796,7 +796,7 @@ void SceneBufferNode::setBuffer(wlr_buffer* wlrBuffer, pixman_region32_t* damage
         );
 
         if (wlr_damage_ring_add(&sceneOutput->wlrDamageRing, outputDamage.raw())) {
-            wlr_output_schedule_frame(sceneOutput->wlrOutput);
+            sceneOutput->scheduleFrame();
         }
     }
 
@@ -854,7 +854,7 @@ void SceneBufferNode::setOpaqueRegion(pixman_region32_t* opaque) {
 
     pixman::Region32 updateRegion;
     bounds(x, y, updateRegion.raw());
-    this->getRootScene()->updateRegion(updateRegion.raw());
+    this->getRootScene()->updateRegion(updateRegion);
 }
 
 

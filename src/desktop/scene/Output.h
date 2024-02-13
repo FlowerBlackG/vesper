@@ -13,6 +13,7 @@
 #include "../../bindings/pixman.h"
 
 #include <vector>
+#include <semaphore>
 
 namespace vesper::desktop::scene {
 
@@ -31,18 +32,20 @@ public:
         bool alwaysRenderEntireScreen;
         bool exportScreenBuffer;
         void* exportScreenBufferDest;
+        bool forceRenderSoftwareCursor;
     };
 
     static Output* create(const CreateOptions&);
 
     void setPosition(int x, int y);
-    void updateGeometry(bool forceUpdate);
+    void updateGeometry(bool forceUpdate, bool dontTouchTreeAndFrame = false);
 
 
     struct StateOptions {
         RenderTimer* timer;
     };
 
+    void scheduleFrame();
 
     bool commit(StateOptions* options);
 
@@ -61,6 +64,7 @@ public:
     bool alwaysRenderEntireScreen;
     bool exportScreenBuffer;
     void* exportScreenBufferDest;
+    bool forceRenderSoftwareCursor;
 
     wlr_output* wlrOutput;
 

@@ -41,6 +41,7 @@ public:
 
     void updateRegion(vesper::bindings::pixman::Region32& updateRegion);
     void updateRegion(pixman_region32_t* updateRegion);
+    void damageOutputs(vesper::bindings::pixman::Region32& damage);
     void damageOutputs(pixman_region32_t* damage);
 
     Output* getSceneOutput(wlr_output* output);

@@ -10,7 +10,9 @@
 #include "./Server.h"
 #include "./View.h"
 
+#include "../scene/Scene.h"
 #include "../scene/SceneNode.h"
+#include "../scene/Output.h"
 
 using namespace std;
 using namespace vesper::bindings;

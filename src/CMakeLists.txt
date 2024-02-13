@@ -104,11 +104,16 @@ target_link_libraries(
     wayland protocols
 ]]
 
-set(XDG_PROTOCOL_DEF "${WAYLANDPROTOCOLS_PATH}/stable/xdg-shell/xdg-shell.xml")
+message(STATUS "wayland protocols at: ${WAYLANDPROTOCOLS_PATH}")
 
 set(WAYLAND_PROTOCOLS_GEN_DIR ${CMAKE_BINARY_DIR}/wayland-protocols)
 
 make_directory(${WAYLAND_PROTOCOLS_GEN_DIR})
+
+
+# xdg-shell
+
+set(XDG_PROTOCOL_DEF "${WAYLANDPROTOCOLS_PATH}/stable/xdg-shell/xdg-shell.xml")
 
 add_custom_command(
     OUTPUT ${WAYLAND_PROTOCOLS_GEN_DIR}/xdg-shell-client-protocol.h

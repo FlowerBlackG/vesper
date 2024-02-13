@@ -23,7 +23,7 @@ namespace vesper::desktop::server {
  */
 static void xdgToplevelMapEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.map);
-    LOG_TEMPORARY("xdg toplevel map: ", view);
+   
     wl_list_insert(&view->server->views, &view->link);
 
     LOG_INFO("new xdg toplevel mapped.");
@@ -37,7 +37,7 @@ static void xdgToplevelMapEventBridge(wl_listener* listener, void* data) {
 static void xdgToplevelUnmapEventBridge(wl_listener* listener, void* data) {
 
     View* view = wl_container_of(listener, view, eventListeners.unmap);
-    LOG_TEMPORARY("xdg unmap");
+   
     if (view == view->server->cursor->grabbedView) {
         view->server->cursor->grabbedView = nullptr;
 

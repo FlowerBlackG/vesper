@@ -53,6 +53,8 @@ extern "C" {
     #include <wlr/backend/headless.h>
     #include <wlr/backend/session.h>
 
+    #include <wlr/interfaces/wlr_output.h>
+
 #undef static
 }
 

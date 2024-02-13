@@ -97,7 +97,7 @@ static void surfaceSurfaceCommitEventBridge (wl_listener* listener, void* data) 
         !wl_list_empty(&surface->wlrSurface->current.frame_callback_list)
         && surface->buffer->primaryOutput != nullptr && enabled
     ) {
-        wlr_output_schedule_frame(surface->buffer->primaryOutput->wlrOutput);
+        surface->buffer->primaryOutput->scheduleFrame();
     }
 }
 

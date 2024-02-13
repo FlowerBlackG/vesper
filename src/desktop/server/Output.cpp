@@ -74,12 +74,15 @@ int Output::init(const CreateOptions& options) {
         server->wlrOutputLayout, wlrOutput
     );
 
+
+    auto& outputOptions = server->options.output;
     scene::Output* sceneOutput = scene::Output::create({
         .scene = server->scene,
         .wlrOutput = wlrOutput,
-        .alwaysRenderEntireScreen = server->options.output.alwaysRenderEntireScreen,
-        .exportScreenBuffer = server->options.output.exportScreenBuffer,
-        .exportScreenBufferDest = server->options.output.exportScreenBufferDest
+        .alwaysRenderEntireScreen = outputOptions.alwaysRenderEntireScreen,
+        .exportScreenBuffer = outputOptions.exportScreenBuffer,
+        .exportScreenBufferDest = outputOptions.exportScreenBufferDest,
+        .forceRenderSoftwareCursor = outputOptions.forceRenderSoftwareCursor,
     });
     
     if (sceneOutput == nullptr) {
