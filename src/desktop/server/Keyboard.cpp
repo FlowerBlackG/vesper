@@ -10,6 +10,8 @@
 #include "./Keyboard.h"
 #include "../../log/Log.h"
 
+#include "../../utils/XKeysymToEvdevScancode.h"
+
 using namespace std;
 
 namespace vesper::desktop::server {
@@ -35,67 +37,87 @@ static void modifiersEventBridge(wl_listener* listener, void* data) {
 static void keyEventBridge(wl_listener* listener, void* data) {
 
     Keyboard* keyboard = wl_container_of(listener, keyboard, eventListeners.key);
-    Server* server = keyboard->server;
     auto* event = (wlr_keyboard_key_event*) data;
-    wlr_seat* seat = server->wlrSeat;
-
-    uint32_t keycode = event->keycode + 8;
-    const xkb_keysym_t* syms;
-    int nsyms = xkb_state_key_get_syms(
-        keyboard->wlrKeyboard->xkb_state, keycode, &syms
+    keyboard->keyEventHandler(
+        event->state == WL_KEYBOARD_KEY_STATE_PRESSED, event->keycode, event->time_msec
     );
-
-    bool handled = false;
-
-    uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->wlrKeyboard);
-
-    if ((modifiers & WLR_MODIFIER_ALT) && event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
-        // 将按键组合 “alt + ?” 视为 vesper 已定义键。
-        for (int i = 0; i < nsyms; i++) {
-            if (syms[i] == XKB_KEY_q || syms[i] == XKB_KEY_Q) {
-                handled = true;
-                wl_display_terminate(server->wlDisplay);
-            }
-        }
-    }
-
-    if (!handled) {
-        // 如果 vesper 自己处理不了，就把它交给客户端处理～
-        
-        wlr_seat_set_keyboard(seat, keyboard->wlrKeyboard);
-        wlr_seat_keyboard_notify_key(seat, event->time_msec, event->keycode, event->state);
-    }
-    
 }
 
 static void destroyEventBridge(wl_listener* listener, void* data) {
     Keyboard* keyboard = wl_container_of(listener, keyboard, eventListeners.destroy);
-
-    wl_list_remove(&keyboard->eventListeners.modifiers.link);
-    wl_list_remove(&keyboard->eventListeners.key.link);
-    wl_list_remove(&keyboard->eventListeners.destroy.link);
-    wl_list_remove(&keyboard->link);
-
     delete keyboard;
 }
+
+
+static wlr_keyboard_impl puyiKeyboardImpl = {
+    .name = "vesper Puyi keyboard",
+    .led_update = [] (wlr_keyboard* keyboard, uint32_t leds) {}
+};
+
+/**
+ * 溥仪键盘。 
+ */
+static wlr_keyboard* createPuyiKeyboard() {
+
+    wlr_keyboard* keyboard = new (nothrow) wlr_keyboard;
+    if (keyboard == nullptr) {
+        return nullptr;
+    }
+
+    memset(keyboard, 0, sizeof(wlr_keyboard));
+
+    wlr_keyboard_init(keyboard, &puyiKeyboardImpl, "vesper Puyi keyboard");
+    return keyboard; // todo: 释放内存。
+}
+
 
 VESPER_OBJ_UTILS_IMPL_CREATE(Keyboard, Keyboard::CreateOptions)
 
 int Keyboard::init(const CreateOptions& options) {
     
     this->server = options.server;
-    this->wlrKeyboard = options.wlrKeyboard;
 
+    if (options.wlrKeyboard) {
+        this->wlrKeyboard = options.wlrKeyboard;
+    } else {
+        this->wlrKeyboard = createPuyiKeyboard();
+        if (wlrKeyboard == nullptr) {
+            LOG_ERROR("failed to create Puyi Keyboard (virtual keyboard agent)!");
+            return -1;
+        }
+
+        // let wlrSeat destroy puyi keyboard 
+
+        eventListeners.puyiKeyboardDestroy.notify = [] (
+            wl_listener* listener, void* data
+        ) {
+            Keyboard* keyboard = wl_container_of(
+                listener, keyboard, eventListeners.puyiKeyboardDestroy
+            );
+            wlr_keyboard* wlrKeyboard = keyboard->wlrKeyboard;
+            wl_signal_emit_mutable(
+                &wlrKeyboard->base.events.destroy, nullptr
+            );
+            delete wlrKeyboard;
+
+        };
+        wl_signal_add(
+            &server->wlrSeat->events.destroy, &eventListeners.puyiKeyboardDestroy
+        );
+    }
+    
+    
     // xkb keymap. 默认采用美式键盘布局。
 
     auto* xkbContext = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
     auto* xkbKeymap = xkb_keymap_new_from_names(xkbContext, nullptr, XKB_KEYMAP_COMPILE_NO_FLAGS);
 
     wlr_keyboard_set_keymap(wlrKeyboard, xkbKeymap);
+    wlr_keyboard_set_repeat_info(wlrKeyboard, 25, 600);
+
     xkb_keymap_unref(xkbKeymap);
     xkb_context_unref(xkbContext);
 
-    wlr_keyboard_set_repeat_info(wlrKeyboard, 25, 600);
 
     // 事件监听
 
@@ -106,7 +128,7 @@ int Keyboard::init(const CreateOptions& options) {
     wl_signal_add(&wlrKeyboard->events.key, &eventListeners.key);
 
     eventListeners.destroy.notify = destroyEventBridge;
-    wl_signal_add(&options.device->events.destroy, &eventListeners.destroy);
+    wl_signal_add(&wlrKeyboard->base.events.destroy, &eventListeners.destroy);
 
     wlr_seat_set_keyboard(server->wlrSeat, wlrKeyboard);
 
@@ -115,4 +137,44 @@ int Keyboard::init(const CreateOptions& options) {
     return 0;
 }
 
+Keyboard::~Keyboard() {
+    wl_list_remove(&eventListeners.modifiers.link);
+    wl_list_remove(&eventListeners.key.link);
+    wl_list_remove(&eventListeners.destroy.link);
+    wl_list_remove(&eventListeners.puyiKeyboardDestroy.link);
+    wl_list_remove(&link);
 }
+
+void Keyboard::keyEventHandler(bool pressed, uint32_t scancode, uint32_t timeMsec) {
+
+    xkb_keysym_t keysym = xkb_state_key_get_one_sym(wlrKeyboard->xkb_state, scancode + 8);
+    
+    uint32_t modifiers = wlr_keyboard_get_modifiers(wlrKeyboard);
+
+    bool handled = false;
+
+    if ((modifiers & WLR_MODIFIER_ALT) && pressed) {
+        // 将按键组合 “alt + ?” 视为 vesper 已定义键。
+        
+        if (keysym == XKB_KEY_q || keysym == XKB_KEY_Q) {
+            handled = true;
+            wl_display_terminate(server->wlDisplay);
+        }
+        
+    }
+
+    if (!handled) {
+        // 如果 vesper 自己处理不了，就把它交给客户端处理～
+        
+        wlr_seat_set_keyboard(server->wlrSeat, wlrKeyboard);
+        
+        wlr_seat_keyboard_notify_key(
+            server->wlrSeat, timeMsec, scancode, 
+            pressed ? WL_KEYBOARD_KEY_STATE_PRESSED : WL_KEYBOARD_KEY_STATE_RELEASED
+        );
+        
+    } // if (!handled)
+
+} // void Keyboard::keyEventHandler(bool pressed, xkb_keysym_t keysym, uint32_t timeMsec)
+
+} // namespace vesper::desktop::server

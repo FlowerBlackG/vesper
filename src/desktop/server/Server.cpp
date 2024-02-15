@@ -13,6 +13,8 @@
 #include "./Output.h"
 
 #include "../../log/Log.h"
+#include "../../utils/XKeysymToEvdevScancode.h"
+#include "../../common/MouseButton.h"
 #include "./View.h"
 #include "../scene/Scene.h"
 #include "../scene/Output.h"
@@ -23,8 +25,11 @@
 #include <unistd.h>
 #include <thread>
 
+#include <linux/input-event-codes.h>
+
 using namespace std;
 using namespace vesper::desktop;
+using namespace vesper::common;
 
 namespace vesper::desktop::server {
 
@@ -104,10 +109,9 @@ static void newInputEventBridge(wl_listener* listener, void* data) {
         auto* wlrKeyboard = wlr_keyboard_from_input_device(device);
         auto* keyboard = Keyboard::create({
             .server = server,
-            .wlrKeyboard = wlrKeyboard,
-            .device = device
+            .wlrKeyboard = wlrKeyboard
         });
-
+        
         if (!keyboard) {
             LOG_ERROR("failed to create keyboard!");
             return;
@@ -176,6 +180,8 @@ static void clearRunOptionsResult(Server::RunOptions& options) {
 int Server::run() {
     
     clearRunOptionsResult(options);
+
+    wl_signal_init(&events.destroy);
 
     this->wlDisplay = wl_display_create();
     auto wlEventLoop = wl_display_get_event_loop(wlDisplay);
@@ -282,7 +288,11 @@ int Server::run() {
     wl_signal_add(&wlrSeat->events.request_set_selection, &eventListeners.requestSetSelection);
 
     if (options.backend.headless && options.backend.virtualOutput.add) {
-        uint32_t cap = WL_SEAT_CAPABILITY_POINTER;
+        Keyboard::create({
+            .server = this,
+            .wlrKeyboard = nullptr
+        });
+        uint32_t cap = WL_SEAT_CAPABILITY_POINTER | WL_SEAT_CAPABILITY_KEYBOARD;
         wlr_seat_set_capabilities(wlrSeat, cap);
     }
 
@@ -340,6 +350,8 @@ int Server::run() {
 }
 
 void Server::clear() {
+
+    wl_signal_emit_mutable(&events.destroy, nullptr);
 
     if (wlDisplay) {
         wl_display_destroy_clients(wlDisplay);
@@ -424,6 +436,25 @@ View* Server::desktopViewAt(
 }
 
 
+/* ============ 运行时，外部传入控制信息 开始 ============ */
+
+static inline int64_t currTimeMsec() {
+    timespec currTime;
+    clock_gettime(CLOCK_MONOTONIC, &currTime);
+    return int64_t(currTime.tv_sec) * 1000 + currTime.tv_nsec / 1000000;
+}
+
+#define IMPL_SERVER_ASYNC_COMMAND_BRIDGE(command) \
+    int Server::command ## Async() { \
+        wl_event_source* event = wl_event_loop_add_timer( \
+            wl_display_get_event_loop(wlDisplay), \
+            command ## AsyncCommandHandler, \
+            &command ## AsyncArgs \
+        ); \
+        \
+        return wl_event_source_timer_update(event, 1); \
+    }
+
 static int setResolutionAsyncCommandHandler(void* data) {
     Server* server = wl_container_of(data, server, setResolutionAsyncArgs);
 
@@ -453,18 +484,7 @@ static int setResolutionAsyncCommandHandler(void* data) {
     return 0;
 }
 
-
-int Server::setResolutionAsync() {
-    wl_event_source* event = wl_event_loop_add_timer(
-        wl_display_get_event_loop(wlDisplay), 
-        setResolutionAsyncCommandHandler, 
-        &setResolutionAsyncArgs
-    );
-
-    return wl_event_source_timer_update(event, 1);
-
-    return 0;
-}
+IMPL_SERVER_ASYNC_COMMAND_BRIDGE(setResolution)
 
 
 static int moveCursorAsyncCommandHandler(void* data) {
@@ -475,16 +495,16 @@ static int moveCursorAsyncCommandHandler(void* data) {
 
     server->moveCursorAsyncArgsMutex.acquire();
 
-    timespec currTime;
-    clock_gettime(CLOCK_MONOTONIC, &currTime);
+    auto currTime = currTimeMsec();
 
-    wlr_seat_pointer_notify_frame(cursor->server->wlrSeat);
 
     wlr_cursor_warp_absolute(cursor->wlrCursor, nullptr, args.absoluteX, args.absoluteY);
-    cursor->processMotion(currTime.tv_sec / 1000 + currTime.tv_nsec / 1000000);
-
+    cursor->processMotion(currTime);
+    
     wlr_cursor_move(cursor->wlrCursor, nullptr, args.deltaX, args.deltaY);
-    cursor->processMotion(currTime.tv_sec / 1000 + currTime.tv_nsec / 1000000);
+    cursor->processMotion(currTime);
+
+    wlr_seat_pointer_notify_frame(server->wlrSeat);
 
     Output* output = wl_container_of(server->outputs.next, output, link);
 
@@ -497,17 +517,138 @@ static int moveCursorAsyncCommandHandler(void* data) {
     return 0;
 }
 
+IMPL_SERVER_ASYNC_COMMAND_BRIDGE(moveCursor)
 
-int Server::moveCursorAsync() {
 
-    wl_event_source* event = wl_event_loop_add_timer(
-        wl_display_get_event_loop(wlDisplay), 
-        moveCursorAsyncCommandHandler, 
-        &moveCursorAsyncArgs
-    );
+static int pressMouseButtonAsyncCommandHandler(void* data) {
+    Server* server = wl_container_of(data, server, pressMouseButtonAsyncArgs);
 
-    return wl_event_source_timer_update(event, 1);
+    auto& args = server->pressMouseButtonAsyncArgs;
+
+    uint32_t button = 0;
+    server->pressMouseButtonAsyncArgsMutex.acquire();
+
+    if (args.button == MouseButton::LEFT) {
+        button = BTN_LEFT;
+    } else if (args.button == MouseButton::MIDDLE) {
+        button = BTN_MIDDLE;
+    } else if (args.button == MouseButton::RIGHT) {
+        button = BTN_RIGHT;
+    }
+
+LOG_TEMPORARY("vnc->server: mouse btn, ", button, ", ", args.press?1:0)
+    if (button) {
+        server->cursor->buttonEventHandler(
+            currTimeMsec(), 
+            button, 
+            args.press ? WLR_BUTTON_PRESSED : WLR_BUTTON_RELEASED
+        );
+        wlr_seat_pointer_notify_frame(server->wlrSeat);
+    }
+    
+    server->pressMouseButtonAsyncArgsMutex.release();
+
+    return 0;
 }
 
+
+IMPL_SERVER_ASYNC_COMMAND_BRIDGE(pressMouseButton)
+
+
+static int scrollAsyncCommandHandler(void* data) {
+    Server* server = wl_container_of(data, server, scrollAsyncArgs);
+
+    auto& args = server->scrollAsyncArgs;
+    
+    server->scrollAsyncArgsMutex.acquire();
+
+    wlr_seat_pointer_notify_axis(
+        server->wlrSeat, currTimeMsec(), 
+        args.vertical ? WLR_AXIS_ORIENTATION_VERTICAL : WLR_AXIS_ORIENTATION_HORIZONTAL,
+        args.delta, args.deltaDiscrete, WLR_AXIS_SOURCE_WHEEL,
+        WLR_AXIS_RELATIVE_DIRECTION_IDENTICAL
+    );
+
+    server->scrollAsyncArgsMutex.release();
+
+    wlr_seat_pointer_notify_frame(server->wlrSeat);
+
+    return 0;
+}
+
+IMPL_SERVER_ASYNC_COMMAND_BRIDGE(scroll)
+
+
+static int keyboardInputAsyncCommandHandler(void* data) {
+    Server* server = wl_container_of(data, server, keyboardInputAsyncArgs);
+    auto& args = server->keyboardInputAsyncArgs;
+
+    server->keyboardInputAsyncArgsMutex.acquire();
+
+    auto scancode = xKeysymToEvdevScancode(args.keysym);
+    wl_keyboard_key_state pressState = WL_KEYBOARD_KEY_STATE_RELEASED;
+    if (args.pressed) {
+        pressState = WL_KEYBOARD_KEY_STATE_PRESSED;
+    }
+
+    if (scancode) {
+        wlr_keyboard_key_event event {
+            .time_msec = currTimeMsec(),
+            .keycode = scancode,
+            .update_state = false,
+            .state = pressState,
+        };
+
+        // 只考虑第一个键盘。
+        Keyboard* keyboard = wl_container_of(server->keyboards.next, keyboard, link);
+        auto& wlrKeyboard = keyboard->wlrKeyboard;
+
+        wlr_keyboard_notify_key(wlrKeyboard, &event);
+        
+        // modifiers
+        
+        xkb_mod_mask_t depressed = xkb_state_serialize_mods(
+            wlrKeyboard->xkb_state, XKB_STATE_MODS_DEPRESSED
+        );
+        xkb_mod_mask_t latched = xkb_state_serialize_mods(
+            wlrKeyboard->xkb_state, XKB_STATE_MODS_LATCHED
+        );
+        xkb_mod_mask_t locked = xkb_state_serialize_mods(
+            wlrKeyboard->xkb_state, XKB_STATE_MODS_LOCKED
+        );
+
+        bool isLock = false;
+        xkb_mod_index_t keyModIdx;
+
+        if (scancodeToXkbModIndex(scancode, wlrKeyboard->keymap, &keyModIdx, &isLock)) {
+
+            xkb_mod_mask_t mask = 1 << keyModIdx;
+
+            if (args.pressed) {
+                depressed |= mask;
+                if (isLock) {
+                    locked ^= mask;
+                }
+            } else {
+                depressed &= ~mask;
+            }
+
+            wlr_keyboard_notify_modifiers(
+                wlrKeyboard, depressed, latched, locked, 
+                wlrKeyboard->modifiers.group
+            );
+        }
+    }
+
+
+    server->keyboardInputAsyncArgsMutex.release();
+
+    return 0;
+}
+
+IMPL_SERVER_ASYNC_COMMAND_BRIDGE(keyboardInput)
+
+#undef IMPL_SERVER_ASYNC_COMMAND_BRIDGE
+/* ============ 运行时，外部传入控制信息 结束 ============ */
 
 }

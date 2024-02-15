@@ -76,11 +76,11 @@ static void xdgToplevelRequestMoveEventBridge(wl_listener* listener, void* data)
  * 
  * 客户端 resize 的内部过程：
  *   1. 鼠标移动到边框后，按下左键，客户端会主动发出一个 resize 请求，由本函数接收。
- *      本函数会告知 server 将鼠标的状态设为“resize”。
- *   2. 之后，鼠标继续移动，不断产生 motion 请求，由 server 处理。
- *      server 发现鼠标处于 resize 状态，于是修改当前聚焦窗口的尺寸。
- *   3. 鼠标左键松开后，产生 button event，由 server 处理。
- *      server 发现 event 的内容是“按键释放”，于是取消鼠标的“resize”状态标记。
+ *      本函数会告知 cursor 将鼠标的状态设为“resize”。
+ *   2. 之后，鼠标继续移动，不断产生 motion 请求，由 cursor 处理。
+ *      cursor 发现鼠标处于 resize 状态，于是修改当前聚焦窗口的尺寸。
+ *   3. 鼠标左键松开后，产生 button event，由 cursor 处理。
+ *      cursor 发现 event 的内容是“按键释放”，于是取消鼠标的“resize”状态标记。
  * 
  * @param listener 
  * @param data 

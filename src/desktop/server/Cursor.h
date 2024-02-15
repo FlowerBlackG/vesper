@@ -39,6 +39,8 @@ public:
     void processMove(uint32_t timeMsec);
     void processResize(uint32_t timeMsec);
 
+    void buttonEventHandler(uint32_t timeMsec, uint32_t button, wlr_button_state state);
+
 
 protected:
     Cursor() {}

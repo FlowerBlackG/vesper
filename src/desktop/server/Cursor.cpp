@@ -61,25 +61,7 @@ static void cursorButtonEventBridge(wl_listener* listener, void* data) {
     Cursor* cursor = wl_container_of(listener, cursor, eventListeners.cursorButton);
 
     auto* event = (wlr_pointer_button_event*) data;
-
-    wlr_seat_pointer_notify_button(
-        cursor->server->wlrSeat, event->time_msec, event->button, event->state
-    );
-
-    double sx, sy;
-    wlr_surface* surface = nullptr;
-    View* view = cursor->server->desktopViewAt(
-        cursor->wlrCursor->x, cursor->wlrCursor->y, &surface, &sx, &sy
-    );
-
-    if (event->state == WLR_BUTTON_RELEASED) {
-        cursor->cursorMode = Cursor::Mode::PASSTHROUGH;
-        cursor->grabbedView = nullptr;
-    } else if (event->state == WLR_BUTTON_PRESSED) {
-        if (view) {
-            view->focus(surface);
-        }
-    }
+    cursor->buttonEventHandler(event->time_msec, event->button, event->state);
 
 }
 
@@ -222,6 +204,26 @@ void Cursor::processResize(uint32_t timeMsec) {
     wlr_xdg_toplevel_set_size(
         view->wlrXdgToplevel, newWidth, newHeight
     );
+}
+
+void Cursor::buttonEventHandler(uint32_t timeMsec, uint32_t button, wlr_button_state state) {
+LOG_TEMPORARY("button event handler")
+    wlr_seat_pointer_notify_button(server->wlrSeat, timeMsec, button, state);
+
+    double sx, sy;
+    wlr_surface* surface = nullptr;
+    View* view = server->desktopViewAt(
+        wlrCursor->x, wlrCursor->y, &surface, &sx, &sy
+    );
+
+    if (state == WLR_BUTTON_RELEASED) {
+        this->cursorMode = Cursor::Mode::PASSTHROUGH;
+        this->grabbedView = nullptr;
+    } else if (state == WLR_BUTTON_PRESSED) {
+        if (view) {
+            view->focus(surface);
+        }
+    }
 }
 
 } // namespace vesper::desktop::server

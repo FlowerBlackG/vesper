@@ -13,7 +13,11 @@
 #include <semaphore>
 #include "../log/Log.h"
 
+#include "../common/MouseButton.h"
+
 #include <rfb/rfb.h>
+#include <xkbcommon/xkbcommon.h>
+
 
 namespace vesper::vnc {
 
@@ -39,7 +43,22 @@ public:
                     bool absolute, double absoluteX, double absoluteY,
                     bool delta, int deltaX, int deltaY
                 )> motion;
+
+                std::function<void (bool press, vesper::common::MouseButton)> button;
+
+                /**
+                 * 
+                 * 
+                 * @param vertical true 表示垂直方向。false 表示水平方向。
+                 * @param delta 从左到右为正；从上到下为正。反向传负数即可。
+                 */
+                std::function<void (bool vertical, double delta, int32_t deltaDiscrete)> axis;
+ 
             } mouse;
+
+            struct {
+                std::function<void (bool pressed, xkb_keysym_t keysym)> key;
+            } keyboard;
             
         } eventHandlers;
         
@@ -60,6 +79,13 @@ public:
 
 
 public:
+
+    struct {
+        int prevX = -1;
+        int prevY = -1;
+        int prevButtonMask = 0;
+    } mouseData;
+
     void mouseEventHandler(int buttonMask, int x, int y, rfbClientPtr cl);
     void keyboardEventHandler(rfbBool down, rfbKeySym keySym, rfbClientPtr cl);
 

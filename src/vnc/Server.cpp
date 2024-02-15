@@ -7,22 +7,14 @@
  */
 
 #include "./Server.h"
+#include <xkbcommon/xkbcommon.h>
 
 using namespace std;
 
+using namespace vesper::common;
+
 namespace vesper::vnc {
     
-
-static void mouseEventBridge(int buttonMask, int x, int y, rfbClientPtr cl) {
-    auto* p = (Server*) cl->screen->screenData;
-    p->mouseEventHandler(buttonMask, x, y, cl);
-}
-
-static void keyboardEventBridge(rfbBool down, rfbKeySym keySym, rfbClientPtr cl) {
-    auto* p = (Server*) cl->screen->screenData;
-    p->keyboardEventHandler(down, keySym, cl);
-}
-
 
 Server::~Server() {
     this->clear();
@@ -63,8 +55,16 @@ int Server::run() {
         .blueShift = 0,
     };
 
-    rfbServer->ptrAddEvent = mouseEventBridge;
-    rfbServer->kbdAddEvent = keyboardEventBridge;
+    rfbServer->ptrAddEvent = [] (int buttonMask, int x, int y, rfbClientPtr cl) {
+        auto* p = (Server*) cl->screen->screenData;
+        p->mouseEventHandler(buttonMask, x, y, cl);
+    };
+    
+    rfbServer->kbdAddEvent = [] (rfbBool down, rfbKeySym keySym, rfbClientPtr cl) {
+        auto* p = (Server*) cl->screen->screenData;
+        p->keyboardEventHandler(down, keySym, cl);
+    };
+
     rfbServer->screenData = this;
 
     rfbInitServer(rfbServer);
@@ -93,37 +93,90 @@ void Server::clear() {
         rfbScreenCleanup(rfbServer);
         this->rfbServer = nullptr;
     }
+
+    mouseData.prevX = mouseData.prevY = -1;
+    mouseData.prevButtonMask = 0;
 }
 
 
 void Server::mouseEventHandler(int buttonMask, int x, int y, rfbClientPtr cl) {
-    auto& handler = options.eventHandlers.mouse.motion;
+    auto& motionHandler = options.eventHandlers.mouse.motion;
+    auto& buttonHandler = options.eventHandlers.mouse.button;
+    auto& axisHandler = options.eventHandlers.mouse.axis;
     auto& screenBufOpts = options.screenBuffer;
-    if (handler) {
-        
-        // todo
-        static int prevX = -1, prevY = -1;
-        int thisDX, thisDY;
-        if (prevX < 0 || prevY < 0) {
-            thisDX = thisDY = 0;
-            prevX = x;
-            prevY = y;
-        } else {
-            thisDX = x - prevX;
-            prevX = x;
-            thisDY = y - prevY;
-            prevY = y;
-        }
+    
+    // motion
 
-        handler(
-            true, double(x) / screenBufOpts.width, double(y) / screenBufOpts.height,
-            true, thisDX, thisDY
-        );
+    if (x != mouseData.prevX || y != mouseData.prevY) {
+        int deltaXAbs = x;
+        if (mouseData.prevX >= 0) {
+            deltaXAbs -= mouseData.prevX;
+        }
+        int deltaYAbs = y;
+        if (mouseData.prevY >= 0) {
+            deltaYAbs -= mouseData.prevY;
+        }
+        mouseData.prevX = x;
+        mouseData.prevY = y;
+
+        if (motionHandler) {
+            motionHandler(
+                true, double(x) / screenBufOpts.width, double(y) / screenBufOpts.height,
+                true, deltaXAbs, deltaYAbs
+            );
+        }
     }
+
+    const int LEFT_MASK = 1 << 0;
+    const int MIDDLE_MASK = 1 << 1;
+    const int RIGHT_MASK = 1 << 2;
+    const int WHEEL_UP_MASK = 1 << 3;
+    const int WHEEL_DOWN_MASK = 1 << 4;
+
+    // 左中右三个按键
+
+    if (mouseData.prevButtonMask != buttonMask) {
+        auto diff = buttonMask ^ mouseData.prevButtonMask;
+
+        if (buttonHandler) {
+            if (diff & LEFT_MASK) {
+                buttonHandler(buttonMask & LEFT_MASK, MouseButton::LEFT);
+            }
+
+            if (diff & MIDDLE_MASK) {
+                buttonHandler(buttonMask & MIDDLE_MASK, MouseButton::MIDDLE);
+            }
+
+            if (diff & RIGHT_MASK) {
+                buttonHandler(buttonMask & RIGHT_MASK, MouseButton::RIGHT);
+            }
+        }
+    }
+
+    // 滚轮
+
+    if (axisHandler) {
+        if (buttonMask & WHEEL_UP_MASK) {
+
+            axisHandler(true, -15, -120);
+        
+        } else if (buttonMask & WHEEL_DOWN_MASK) {
+
+            axisHandler(true, 15, 120);
+
+        }
+    }
+
+    mouseData.prevButtonMask = buttonMask;
+
 }
 
 void Server::keyboardEventHandler(rfbBool down, rfbKeySym keySym, rfbClientPtr cl) {
-    // todo
+    auto& handler = options.eventHandlers.keyboard.key;
+    if (handler) {
+        handler(!!down, keySym);
+    }
+    
 }
 
 }

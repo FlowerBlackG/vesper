@@ -719,10 +719,12 @@ void SceneBufferNode::setBuffer(wlr_buffer* wlrBuffer, pixman_region32_t* damage
         return;
     }
 
-    pixman_region32_t fallbackDamage;
-    pixman_region32_init_rect(&fallbackDamage, 0, 0, wlrBuffer->width, wlrBuffer->height);
+    pixman::Region32 fallbackDamage = (const wlr_box) {
+        .x = 0, .y = 0, .width = wlrBuffer->width, .height = wlrBuffer->height
+    };
+    
     if (!damage) {
-        damage = &fallbackDamage;
+        damage = fallbackDamage.raw();
     }
 
     wlr_fbox box = srcBox;
@@ -800,7 +802,6 @@ void SceneBufferNode::setBuffer(wlr_buffer* wlrBuffer, pixman_region32_t* damage
         }
     }
 
-    pixman_region32_fini(&fallbackDamage);
 }
 
 

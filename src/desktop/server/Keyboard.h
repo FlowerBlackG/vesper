@@ -22,10 +22,13 @@ public:
     struct CreateOptions {
         Server* server;
         wlr_keyboard* wlrKeyboard;
-        wlr_input_device* device;
     };
 
     static Keyboard* create(const CreateOptions& options);
+
+    ~Keyboard();
+    
+    void keyEventHandler(bool pressed, uint32_t scancode, uint32_t timeMsec);
 
 protected:
     Keyboard() {};
@@ -44,6 +47,10 @@ public:
         wl_listener modifiers;
         wl_listener key;
         wl_listener destroy;
+
+        /** for Puyi keyboard. */
+        wl_listener puyiKeyboardDestroy;
+
     } eventListeners;
 };
 

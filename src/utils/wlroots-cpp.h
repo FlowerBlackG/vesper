@@ -54,6 +54,7 @@ extern "C" {
     #include <wlr/backend/session.h>
 
     #include <wlr/interfaces/wlr_output.h>
+    #include <wlr/interfaces/wlr_keyboard.h>
 
 #undef static
 }

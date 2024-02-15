@@ -10,6 +10,7 @@
 
 #include "../../utils/wlroots-cpp.h"
 #include "../../utils/ObjUtils.h"
+#include "../../common/MouseButton.h"
 #include "./Output.h"
 
 #include <unistd.h>
@@ -123,8 +124,6 @@ public:
     int setResolutionAsync();
     
     
-
-    
     std::binary_semaphore moveCursorAsyncArgsMutex {1};
     struct {
         bool absolute;
@@ -135,10 +134,38 @@ public:
         int deltaY;
 
     } moveCursorAsyncArgs;
+
     /**
      * 使用前先设置在结构体内设置好数据。
      */
     int moveCursorAsync();
+
+
+    std::binary_semaphore pressMouseButtonAsyncArgsMutex {1};
+    struct {
+        /** true for press, false for release. */
+        bool press;
+        vesper::common::MouseButton button;
+    } pressMouseButtonAsyncArgs;
+
+    int pressMouseButtonAsync();
+
+
+    std::binary_semaphore scrollAsyncArgsMutex {1};
+    struct {
+        bool vertical;
+        double delta;
+        int32_t deltaDiscrete;
+    } scrollAsyncArgs;
+    int scrollAsync();
+
+
+    std::binary_semaphore keyboardInputAsyncArgsMutex {1};
+    struct {
+        xkb_keysym_t keysym;
+        bool pressed;
+    } keyboardInputAsyncArgs;
+    int keyboardInputAsync();
 
     /* ============ 对外方法 结束 ============ */
 
@@ -202,6 +229,10 @@ public:
         wl_listener requestSetCursor;
         wl_listener requestSetSelection;
     } eventListeners;
+
+    struct {
+        wl_signal destroy;
+    } events;
     
     /* ============ vesper desktop 模块内部使用 结尾 ============ */
 

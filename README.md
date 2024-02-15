@@ -23,3 +23,4 @@
 * \[9\] wlroots. tinywl. [https://gitlab.freedesktop.org/wlroots/wlroots/-/tree/master/tinywl](https://gitlab.freedesktop.org/wlroots/wlroots/-/tree/master/tinywl)
 * \[10\] Wayland. weston – A lightweight and functional Wayland compositor. [https://gitlab.freedesktop.org/wayland/weston](https://gitlab.freedesktop.org/wayland/weston)
 * [11] [码农飞飞](https://blog.csdn.net/yang1fei2 "码农飞飞"). 使用libvncserver库快速搭建VNC服务端. [https://blog.csdn.net/yang1fei2/article/details/132371918](https://blog.csdn.net/yang1fei2/article/details/132371918)
+* [12] X Consortium. X Window System Protocol. The Open Group, 2004

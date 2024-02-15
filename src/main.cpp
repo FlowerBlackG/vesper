@@ -24,11 +24,13 @@
 #include "vnc/Server.h"
 
 #include "./utils/wlroots-cpp.h"
+#include "./common/MouseButton.h"
 
 #include <pixman-1/pixman-version.h>
 
 using namespace std;
 using namespace vesper;
+using namespace vesper::common;
 
 static void printVersion() {
     LOG_INFO(
@@ -51,7 +53,7 @@ static void printVersion() {
 void serverSetOptions(desktop::server::Server& server) {
     auto& options = server.options;
 
-    options.backend.headless = 1;
+    options.backend.headless = 0;
     options.backend.virtualOutput.add = true;
     options.backend.virtualOutput.width = 1280;
     options.backend.virtualOutput.height = 720;
@@ -120,6 +122,41 @@ int main(int argc, const char* argv[]) {
         desktop.moveCursorAsync();
         desktop.moveCursorAsyncArgsMutex.release();
     };
+
+    vnc.options.eventHandlers.mouse.button = [&desktop] (
+        bool press, MouseButton button
+    ) {
+        desktop.pressMouseButtonAsyncArgsMutex.acquire();
+        auto& args = desktop.pressMouseButtonAsyncArgs;
+        args.press = press;
+        args.button = button;
+        desktop.pressMouseButtonAsync();
+        desktop.pressMouseButtonAsyncArgsMutex.release();
+    };
+
+    vnc.options.eventHandlers.mouse.axis = [&desktop] (
+        bool vertical, double delta, int32_t deltaDiscrete
+    ) {
+        desktop.scrollAsyncArgsMutex.acquire();
+        auto& args = desktop.scrollAsyncArgs;
+        args.vertical = vertical;
+        args.delta = delta;
+        args.deltaDiscrete = deltaDiscrete;
+        desktop.scrollAsync();
+        desktop.scrollAsyncArgsMutex.release();
+    };
+
+    vnc.options.eventHandlers.keyboard.key = [&desktop] (
+        bool pressed, xkb_keysym_t keysym
+    ) {
+        desktop.keyboardInputAsyncArgsMutex.acquire();
+        auto& args = desktop.keyboardInputAsyncArgs;
+        args.keysym = keysym;
+        args.pressed = pressed;
+        desktop.keyboardInputAsync();
+        desktop.keyboardInputAsyncArgsMutex.release();
+    };
+
     thread vncThread([&vnc] () {
         int res = vnc.run();
         LOG_INFO("vnc server exited with code: ", res);
