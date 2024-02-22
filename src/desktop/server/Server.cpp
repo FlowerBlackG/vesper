@@ -328,7 +328,7 @@ int Server::run() {
 
     setenv("WAYLAND_DISPLAY", socket, true); 
     if (fork() == 0) {
-        execl("/bin/sh", "/bin/sh", "-c", "firefox", 0);
+        execl("/bin/sh", "/bin/sh", "-c", "LIBGL_ALWAYS_SOFTWARE=1 kgx", 0);
     }
 
     LOG_INFO("server running...");
