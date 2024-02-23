@@ -40,7 +40,7 @@ int Server::run() {
         8, 3, 4 
     );
 
-    rfbServer->frameBuffer = options.screenBuffer.getBuffer(); // todo
+    rfbServer->frameBuffer = nullptr;
     rfbServer->alwaysShared = true;
     rfbServer->serverFormat = {
         .bitsPerPixel = 32,
@@ -66,6 +66,7 @@ int Server::run() {
     };
 
     rfbServer->screenData = this;
+    rfbServer->desktopName = "vesper remote - 2051565";
 
     rfbInitServer(rfbServer);
 
@@ -76,6 +77,10 @@ int Server::run() {
     options.result.serverLaunchedSignal.release();
 
     while (true) {
+        if (rfbServer->frameBuffer && options.screenBuffer.recycleBuffer) {
+            options.screenBuffer.recycleBuffer(rfbServer->frameBuffer);
+        }
+        rfbServer->frameBuffer = (char*) options.screenBuffer.getBuffer();
         rfbMarkRectAsModified(rfbServer, 0, 0, options.screenBuffer.width, options.screenBuffer.height);
         rfbProcessEvents(rfbServer, 50000);
     }

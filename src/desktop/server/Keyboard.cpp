@@ -79,6 +79,7 @@ int Keyboard::init(const CreateOptions& options) {
 
     if (options.wlrKeyboard) {
         this->wlrKeyboard = options.wlrKeyboard;
+        wl_list_init(&eventListeners.puyiKeyboardDestroy.link);
     } else {
         this->wlrKeyboard = createPuyiKeyboard();
         if (wlrKeyboard == nullptr) {
@@ -158,7 +159,7 @@ void Keyboard::keyEventHandler(bool pressed, uint32_t scancode, uint32_t timeMse
         
         if (keysym == XKB_KEY_q || keysym == XKB_KEY_Q) {
             handled = true;
-            wl_display_terminate(server->wlDisplay);
+            server->terminate();
         }
         
     }

@@ -17,6 +17,7 @@
 #include <string>
 #include <vector>
 #include <semaphore>
+#include <map>
 
 namespace vesper::desktop::scene { class Scene; }
 namespace vesper::desktop::scene { class OutputLayout; }
@@ -87,7 +88,6 @@ public:
             bool alwaysRenderEntireScreen;
             
             bool exportScreenBuffer;
-            void* exportScreenBufferDest;
 
             bool forceRenderSoftwareCursor;
         } output = {0};
@@ -110,6 +110,11 @@ public:
     } options;
 
     int run();
+    void terminate();
+
+    std::map<void*, wlr_buffer*> framebufferRentMap;
+    void* getFramebuffer(int displayIndex);
+    void recycleFramebuffer(void* oldFrameData, int displayIndex);
 
     /* ------ 运行过程中发送更新信息 ------ */
 
@@ -192,6 +197,7 @@ protected:
 public:
 
     wl_display* wlDisplay = nullptr;
+    bool terminated = false;
     wlr_backend* wlrBackend = nullptr;
     wlr_renderer* wlrRenderer = nullptr;
     wlr_allocator* wlrAllocator = nullptr;

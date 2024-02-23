@@ -31,7 +31,6 @@ public:
         wlr_output* wlrOutput;
         bool alwaysRenderEntireScreen;
         bool exportScreenBuffer;
-        void* exportScreenBufferDest;
         bool forceRenderSoftwareCursor;
     };
 
@@ -63,7 +62,6 @@ public:
 
     bool alwaysRenderEntireScreen;
     bool exportScreenBuffer;
-    void* exportScreenBufferDest;
     bool forceRenderSoftwareCursor;
 
     wlr_output* wlrOutput;
@@ -109,6 +107,26 @@ public:
     };
 
     std::vector<RenderListEntry> renderList;
+
+
+    struct FramebufferPlate {
+        struct {
+            wlr_buffer* buf = nullptr;
+            std::binary_semaphore lock {1};
+        } buf;
+
+        struct {
+            std::vector<wlr_buffer*> bin;
+            std::binary_semaphore lock {1};
+        } recycleBin;
+
+        ~FramebufferPlate();
+        void recycle(wlr_buffer*);
+        wlr_buffer* get();
+        void put(wlr_buffer*);
+
+    } framebufferPlate;
+
 
 }; // class Output
 

@@ -11,6 +11,8 @@
 #include "../../utils/wlroots-cpp.h"
 #include "../../utils/ObjUtils.h"
 
+namespace vesper::desktop::scene { class Output; }
+
 namespace vesper::desktop::server {
 
 class Server;
@@ -43,6 +45,7 @@ public:
     wl_list link;
     Server* server;
     wlr_output* wlrOutput;
+    vesper::desktop::scene::Output* sceneOutput;
 
     struct {
         wl_listener frame; // 输出一帧

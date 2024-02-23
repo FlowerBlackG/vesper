@@ -49,7 +49,7 @@ static void destroyEventBridge(wl_listener* listener, void* data) {
 
     delete output;
 
-    wl_display_terminate(server->wlDisplay);
+    server->terminate();
 }
 
 VESPER_OBJ_UTILS_IMPL_CREATE(Output, Output::CreateOptions);
@@ -76,12 +76,11 @@ int Output::init(const CreateOptions& options) {
 
 
     auto& outputOptions = server->options.output;
-    scene::Output* sceneOutput = scene::Output::create({
+    sceneOutput = scene::Output::create({
         .scene = server->scene,
         .wlrOutput = wlrOutput,
         .alwaysRenderEntireScreen = outputOptions.alwaysRenderEntireScreen,
         .exportScreenBuffer = outputOptions.exportScreenBuffer,
-        .exportScreenBufferDest = outputOptions.exportScreenBufferDest,
         .forceRenderSoftwareCursor = outputOptions.forceRenderSoftwareCursor,
     });
     

@@ -91,7 +91,6 @@ int Output::init(const CreateOptions& options) {
 
     this->alwaysRenderEntireScreen = options.alwaysRenderEntireScreen;
     this->exportScreenBuffer = options.exportScreenBuffer;
-    this->exportScreenBufferDest = options.exportScreenBufferDest;
     this->forceRenderSoftwareCursor = options.forceRenderSoftwareCursor;
 
     wlr_addon_init(&this->addon, &wlrOutput->addons, scene, &sceneOutputAddonImpl);
@@ -164,21 +163,7 @@ void Output::updateGeometry(bool forceUpdate, bool dontTouchTreeAndFrame) {
 }
 
 void Output::scheduleFrame() {
-    
-    // 确保合成器提交一个新的帧。
-
-    wlr_output_update_needs_frame(wlrOutput);
-
-    if (wlrOutput->frame_pending) {
-        return;
-    }
-
-    if (!wlrOutput->frame_pending) {
-        wlr_output_send_frame(wlrOutput);
-    } else {
-        LOG_WARN("signal didn't emit. reason: frame pending");
-    }
-    
+    wlr_output_schedule_frame(this->wlrOutput);
 }
 
 
@@ -656,30 +641,9 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
 
     wlr_output_state_set_buffer(state, buffer);
 
-    if (exportScreenBuffer) do { // 用 do while (0) 是为了让内部可以直接用 break 提前跳出。
-        pixman_image_t* img = wlr_pixman_renderer_get_buffer_image(
-            this->wlrOutput->renderer, buffer
-        );
-
-        if (img == nullptr) {
-            LOG_ERROR("cannot get screen buffer!");
-            break;
-        }
-
-        auto imgHeight = pixman_image_get_height(img);
-        auto imgFormat = pixman_image_get_format(img);
-
-        if (imgFormat != PIXMAN_a8r8g8b8 && imgFormat != PIXMAN_x8r8g8b8) {
-            LOG_ERROR("bad format: ", int64_t(imgFormat));
-            break;
-        }
-
-        auto imgStride = pixman_image_get_stride(img);
-        auto imgData = pixman_image_get_data(img);
-
-        memcpy(exportScreenBufferDest, imgData, imgStride * imgHeight);
-
-    } while (false);
+    if (exportScreenBuffer) {
+        this->framebufferPlate.put(buffer);
+    }
 
     wlr_buffer_unlock(buffer);
 
@@ -708,6 +672,60 @@ Output::~Output() {
     wl_list_remove(&eventListeners.outputDamage.link);
     wl_list_remove(&eventListeners.outputNeedsFrame.link);
 
+}
+
+
+Output::FramebufferPlate::~FramebufferPlate() {
+    buf.lock.acquire();
+    recycleBin.lock.acquire();
+    
+    if (buf.buf) {
+        wlr_buffer_unlock(buf.buf);
+    }
+
+    for (auto& it : recycleBin.bin) {
+        wlr_buffer_unlock(it);
+    }
+}
+
+void Output::FramebufferPlate::recycle(wlr_buffer* oldBuf) {
+    recycleBin.lock.acquire();
+    recycleBin.bin.push_back(oldBuf);
+    recycleBin.lock.release();
+}
+
+
+wlr_buffer* Output::FramebufferPlate::get() {
+    buf.lock.acquire();
+    auto* ret = buf.buf;
+    if (ret) {
+        wlr_buffer_lock(ret);
+    }
+    buf.lock.release();
+    return ret;
+}
+
+
+void Output::FramebufferPlate::put(wlr_buffer* newBuf) {
+    
+    // 先倒垃圾。
+    
+    recycleBin.lock.acquire();
+    for (auto& it : recycleBin.bin) {
+        wlr_buffer_unlock(it);
+    }
+    recycleBin.bin.clear();
+    recycleBin.lock.release();
+    
+    
+    buf.lock.acquire();
+    if (buf.buf) {
+        wlr_buffer_unlock(buf.buf);
+    }
+    buf.buf = newBuf;
+    wlr_buffer_lock(newBuf);
+    buf.lock.release();
+    
 }
 
 }

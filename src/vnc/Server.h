@@ -34,7 +34,8 @@ public:
         struct {
             int width;
             int height;
-            std::function<char* ()> getBuffer;
+            std::function<void* ()> getBuffer;
+            std::function<void (void*)> recycleBuffer;
         } screenBuffer;
 
         struct {

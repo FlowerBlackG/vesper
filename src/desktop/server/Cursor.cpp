@@ -207,7 +207,7 @@ void Cursor::processResize(uint32_t timeMsec) {
 }
 
 void Cursor::buttonEventHandler(uint32_t timeMsec, uint32_t button, wlr_button_state state) {
-LOG_TEMPORARY("button event handler")
+
     wlr_seat_pointer_notify_button(server->wlrSeat, timeMsec, button, state);
 
     double sx, sy;

@@ -11,6 +11,7 @@
 #include <sstream>
 #include <thread>
 #include <semaphore>
+#include <memory>
 
 #include <unistd.h>
 
@@ -50,7 +51,7 @@ static void printVersion() {
     );
 }
 
-void serverSetOptions(desktop::server::Server& server) {
+static void serverSetOptions(desktop::server::Server& server) {
     auto& options = server.options;
 
     options.backend.headless = 0;
@@ -60,7 +61,7 @@ void serverSetOptions(desktop::server::Server& server) {
     options.renderer.pixman = true;
 
     options.launch.apps.push_back("konsole");
-    //options.launch.apps.push_back("LIBGL_ALWAYS_SOFTWARE=1 kgx");
+    options.launch.apps.push_back("LIBGL_ALWAYS_SOFTWARE=1 kgx");
 
     options.output.alwaysRenderEntireScreen = true;
     options.output.exportScreenBuffer = true;
@@ -68,45 +69,25 @@ void serverSetOptions(desktop::server::Server& server) {
 
 }
 
-void vncSetOptions(vnc::Server& vnc) {
+static void vncSetOptions(
+    vnc::Server& vnc, desktop::server::Server& desktop, void* screenBufferFallback
+) {
+
     auto& options = vnc.options;
     options.screenBuffer.width = 1280;
     options.screenBuffer.height = 720;
-}
 
-int main(int argc, const char* argv[]) {
-
-    printVersion();
-
-    LOG_INFO("creating desktop server")
-
-  
-
-    char* buf = new char[1280 * 720 * 4 * 10];
-
-    desktop::server::Server desktop;
-    auto& desktopResult = desktop.options.result;
-    serverSetOptions(desktop);
-    desktop.options.output.exportScreenBufferDest = buf;
-    
-    thread desktopThread([&desktop] () {
-        int res = desktop.run();
-        LOG_INFO("desktop server exited with code: ", res);
-    });
-    
-    desktopResult.serverLaunchedSignal.acquire();
-    
-    if (desktopResult.code) {
-        LOG_ERROR("server failed with code: ", desktopResult.code);
-        return -1;
-    }
-
-    vnc::Server vnc;
-    auto& vncResult = vnc.options.result;
-    vncSetOptions(vnc);
-    vnc.options.screenBuffer.getBuffer = [&buf] () {
-        return buf;
+    options.screenBuffer.getBuffer = [&desktop, screenBufferFallback] () {
+        void* buf = desktop.getFramebuffer(0);
+        return buf ? buf : screenBufferFallback;
     };
+
+    options.screenBuffer.recycleBuffer = [&desktop, screenBufferFallback] (void* buf) {
+        if (buf != screenBufferFallback) {
+            desktop.recycleFramebuffer(buf, 0);
+        }
+    };
+
     vnc.options.eventHandlers.mouse.motion = [&desktop] (
         bool absolute, double absoluteX, double absoluteY,
         bool delta, int deltaX, int deltaY
@@ -157,6 +138,38 @@ int main(int argc, const char* argv[]) {
         desktop.keyboardInputAsyncArgsMutex.release();
     };
 
+}
+
+
+int main(int argc, const char* argv[]) {
+
+    printVersion();
+
+    LOG_INFO("creating desktop server")
+  
+    auto vncFramebufferFallback = unique_ptr<char[]>(new char[1280 * 720 * 4 * 10]());
+    
+    desktop::server::Server desktop;
+    auto& desktopResult = desktop.options.result;
+    serverSetOptions(desktop);
+    
+    thread desktopThread([&desktop] () {
+        int res = desktop.run();
+        LOG_INFO("desktop server exited with code: ", res);
+    });
+    
+    desktopResult.serverLaunchedSignal.acquire();
+    
+    if (desktopResult.code) {
+        LOG_ERROR("server failed with code: ", desktopResult.code);
+        return -1;
+    }
+
+    vnc::Server vnc;
+    auto& vncResult = vnc.options.result;
+    vncSetOptions(vnc, desktop, vncFramebufferFallback.get());
+
+    
     thread vncThread([&vnc] () {
         int res = vnc.run();
         LOG_INFO("vnc server exited with code: ", res);
@@ -164,12 +177,6 @@ int main(int argc, const char* argv[]) {
 
     vncThread.join();
     desktopThread.join();
-
-
-
-
-    delete[] buf;
-
 
     LOG_INFO("bye~");
     return 0;

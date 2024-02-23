@@ -52,6 +52,7 @@ extern "C" {
 
     #include <wlr/backend/headless.h>
     #include <wlr/backend/session.h>
+    #include <wlr/backend/wayland.h>
 
     #include <wlr/interfaces/wlr_output.h>
     #include <wlr/interfaces/wlr_keyboard.h>

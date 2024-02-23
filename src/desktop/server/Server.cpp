@@ -184,6 +184,7 @@ int Server::run() {
     wl_signal_init(&events.destroy);
 
     this->wlDisplay = wl_display_create();
+    this->terminated = false;
     auto wlEventLoop = wl_display_get_event_loop(wlDisplay);
     
     // backend
@@ -349,6 +350,19 @@ int Server::run() {
     return 0;
 }
 
+void Server::terminate() {
+    if (terminated) {
+        return;
+    }
+
+    terminated = true;
+    wl_event_loop_add_idle(
+        wl_display_get_event_loop(wlDisplay),
+        [] (void* data) { wl_display_terminate( (wl_display*) data ); },
+        this->wlDisplay
+    );
+}
+
 void Server::clear() {
 
     wl_signal_emit_mutable(&events.destroy, nullptr);
@@ -367,17 +381,97 @@ void Server::clear() {
         cursor = nullptr;
     }
 
+    Keyboard* keyboard;
+    Keyboard* keyboardTmp;
+    wl_list_for_each_safe(keyboard, keyboardTmp, &this->keyboards, link) {
+        delete keyboard;
+    }
+    
+    if (wlrSeat) {
+        wlr_seat_destroy(wlrSeat);
+        wlrSeat = nullptr;
+    }
+
+    if (wlrBackend) {
+        wlr_backend_destroy(wlrBackend);
+        wlrBackend = nullptr;
+    }
+    
+    
     if (wlDisplay) {
         wl_display_destroy(wlDisplay);
         wlDisplay = nullptr;
     }
 
-    if (wlrSeat) {
-        wlr_seat_destroy(wlrSeat);
-        wlrSeat = nullptr;
-    }
 }
 
+void* Server::getFramebuffer(int displayIndex) {
+    int currIdx = -1;
+    Output* serverOutput;
+    wl_list_for_each(serverOutput, &this->outputs, link) {
+        currIdx++;
+        if (currIdx == displayIndex) {
+            break;
+        }
+    }
+
+    if (displayIndex != currIdx) {
+        return nullptr;
+    }
+
+    auto& plate = serverOutput->sceneOutput->framebufferPlate;
+
+    wlr_buffer* wlrBuf = plate.get();
+    if (!wlrBuf) {
+        return nullptr;
+    }
+
+    pixman_image_t* img = wlr_pixman_renderer_get_buffer_image(
+        serverOutput->wlrOutput->renderer, wlrBuf
+    );
+
+    if (!img) {
+        plate.recycle(wlrBuf);
+        return nullptr;
+    }
+
+    auto imgFormat = pixman_image_get_format(img);
+    if (imgFormat != PIXMAN_a8r8g8b8 && imgFormat != PIXMAN_x8r8g8b8) {
+        LOG_WARN("bad format: ", int64_t(imgFormat));
+        plate.recycle(wlrBuf);
+        return nullptr;
+    }
+
+    auto* data = pixman_image_get_data(img);
+    framebufferRentMap[(void*) data] = wlrBuf;
+    return data;
+}
+
+void Server::recycleFramebuffer(void* oldFrameData, int displayIndex) {
+    if (!framebufferRentMap.contains(oldFrameData)) {
+        LOG_WARN("frame data unrecognized!");
+        return;
+    }
+
+    wlr_buffer* oldBuf = framebufferRentMap[oldFrameData];
+    framebufferRentMap.erase(oldFrameData);
+
+    int currIdx = -1;
+    Output* serverOutput;
+    wl_list_for_each(serverOutput, &this->outputs, link) {
+        currIdx++;
+        if (currIdx == displayIndex) {
+            break;
+        }
+    }
+
+    if (currIdx != displayIndex) {
+        LOG_WARN("there's no display with index ", displayIndex);
+        return;
+    }
+
+    serverOutput->sceneOutput->framebufferPlate.recycle(oldBuf);
+}
 
 void Server::newOutputEventHandler(wlr_output* newOutput) {
     wlr_output_init_render(newOutput, wlrAllocator, wlrRenderer);
@@ -444,6 +538,7 @@ static inline int64_t currTimeMsec() {
     return int64_t(currTime.tv_sec) * 1000 + currTime.tv_nsec / 1000000;
 }
 
+#if 0 // todo
 #define IMPL_SERVER_ASYNC_COMMAND_BRIDGE(command) \
     int Server::command ## Async() { \
         wl_event_source* event = wl_event_loop_add_timer( \
@@ -454,6 +549,18 @@ static inline int64_t currTimeMsec() {
         \
         return wl_event_source_timer_update(event, 1); \
     }
+#else // todo : 优化性能
+#define IMPL_SERVER_ASYNC_COMMAND_BRIDGE(command) \
+    int Server::command ## Async() { \
+        wl_event_source* event = wl_event_loop_add_timer( \
+            wl_display_get_event_loop(wlDisplay), \
+            command ## AsyncCommandHandler, \
+            &command ## AsyncArgs \
+        ); \
+        \
+        return wl_event_source_timer_update(event, 1); \
+    }
+#endif // todo
 
 static int setResolutionAsyncCommandHandler(void* data) {
     Server* server = wl_container_of(data, server, setResolutionAsyncArgs);
@@ -499,9 +606,8 @@ static int moveCursorAsyncCommandHandler(void* data) {
 
 
     wlr_cursor_warp_absolute(cursor->wlrCursor, nullptr, args.absoluteX, args.absoluteY);
-    cursor->processMotion(currTime);
-    
     wlr_cursor_move(cursor->wlrCursor, nullptr, args.deltaX, args.deltaY);
+    
     cursor->processMotion(currTime);
 
     wlr_seat_pointer_notify_frame(server->wlrSeat);
@@ -536,7 +642,7 @@ static int pressMouseButtonAsyncCommandHandler(void* data) {
         button = BTN_RIGHT;
     }
 
-LOG_TEMPORARY("vnc->server: mouse btn, ", button, ", ", args.press?1:0)
+
     if (button) {
         server->cursor->buttonEventHandler(
             currTimeMsec(), 
