@@ -3,7 +3,7 @@
     创建于 2023年12月26日 上海市嘉定区安亭镇
 ]]
 
-cmake_minimum_required(VERSION 3.28.1)
+cmake_minimum_required(VERSION 3.24.1)
 
 
 #[[
@@ -64,7 +64,7 @@ find_package(Pixman REQUIRED)
 find_package(Wlroots REQUIRED)
 find_package(XKB REQUIRED)
 find_package(LibVNCServer REQUIRED)
-
+find_package(Systemd REQUIRED)
 find_package(WaylandProtocols REQUIRED)
 
 find_package(JPEG REQUIRED)
@@ -79,7 +79,7 @@ include_directories(
     ${WLR_INCLUDE_DIRS} 
     ${XKB_INCLUDE_DIRS} 
     ${PIXMAN_INCLUDE_DIRS}
-
+    ${SYSTEMD_INCLUDE_DIRS}
     ${WAYLAND_PROTOCOLS_GEN_DIR}
 
 
@@ -95,6 +95,7 @@ target_link_libraries(
     ${XKB_LIBRARIES} 
     ${PIXMAN_LIBRARIES}
     LibVNCServer::vncserver
+    ${SYSTEMD_LIBRARIES}
 
     ${JPEG_LIBRARIES}
 )

@@ -30,7 +30,7 @@ inline static void printCurrentTime() {
     strftime(
         timeStr, 
         sizeof(timeStr) / sizeof(char), 
-        "%Y-%m-%d %H:%M:%S", 
+        "[%Y-%m-%d %H:%M:%S]", 
         currTm
     );
     clog << timeStr;
@@ -39,8 +39,10 @@ inline static void printCurrentTime() {
 void printInfo(const char* filename, int line) {
     printCurrentTime();
     clog << " ";
+#if 0 //todo
     printLineInfo(filename, line);
     clog.put(' ');
+#endif
 }
 
 }

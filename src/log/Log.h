@@ -48,8 +48,8 @@ inline void setColorError() {
 }
 
 
-}
-}
+} // namespace log
+} // namespace vesper
 
 // file name 这个宏应该是可以用的，但是编辑器容易误报错。这里假装再定义一下。
 #ifndef __FILE_NAME__
