@@ -61,7 +61,7 @@ static void serverSetOptions(desktop::server::Server& server) {
     options.renderer.pixman = true;
 
     options.launch.apps.push_back("konsole");
-    options.launch.apps.push_back("LIBGL_ALWAYS_SOFTWARE=1 kgx");
+    //options.launch.apps.push_back("LIBGL_ALWAYS_SOFTWARE=1 kgx");
 
     options.output.alwaysRenderEntireScreen = true;
     options.output.exportScreenBuffer = true;

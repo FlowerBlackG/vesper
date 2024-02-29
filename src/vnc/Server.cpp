@@ -110,28 +110,6 @@ void Server::mouseEventHandler(int buttonMask, int x, int y, rfbClientPtr cl) {
     auto& axisHandler = options.eventHandlers.mouse.axis;
     auto& screenBufOpts = options.screenBuffer;
     
-    // motion
-
-    if (x != mouseData.prevX || y != mouseData.prevY) {
-        int deltaXAbs = x;
-        if (mouseData.prevX >= 0) {
-            deltaXAbs -= mouseData.prevX;
-        }
-        int deltaYAbs = y;
-        if (mouseData.prevY >= 0) {
-            deltaYAbs -= mouseData.prevY;
-        }
-        mouseData.prevX = x;
-        mouseData.prevY = y;
-
-        if (motionHandler) {
-            motionHandler(
-                true, double(x) / screenBufOpts.width, double(y) / screenBufOpts.height,
-                true, deltaXAbs, deltaYAbs
-            );
-        }
-    }
-
     const int LEFT_MASK = 1 << 0;
     const int MIDDLE_MASK = 1 << 1;
     const int RIGHT_MASK = 1 << 2;
@@ -173,6 +151,28 @@ void Server::mouseEventHandler(int buttonMask, int x, int y, rfbClientPtr cl) {
     }
 
     mouseData.prevButtonMask = buttonMask;
+
+    // motion
+
+    if (x != mouseData.prevX || y != mouseData.prevY) {
+        int deltaXAbs = x;
+        if (mouseData.prevX >= 0) {
+            deltaXAbs -= mouseData.prevX;
+        }
+        int deltaYAbs = y;
+        if (mouseData.prevY >= 0) {
+            deltaYAbs -= mouseData.prevY;
+        }
+        mouseData.prevX = x;
+        mouseData.prevY = y;
+
+        if (motionHandler) {
+            motionHandler(
+                true, double(x) / screenBufOpts.width, double(y) / screenBufOpts.height,
+                true, deltaXAbs, deltaYAbs
+            );
+        }
+    }
 
 }
 
