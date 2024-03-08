@@ -76,8 +76,7 @@ public:
 
     void clear();
 
-public:
-
+    void terminate();
 
 public:
 
@@ -92,6 +91,7 @@ public:
 
 protected:
     rfbScreenInfoPtr rfbServer = nullptr;
+    bool systemRunning;
 
 
 };

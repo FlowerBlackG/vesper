@@ -36,6 +36,10 @@ Wayland 图形合成器 & 窗口管理；VNC 远程桌面服务器。
 
 ![img](./doc/images/vesper-overview.drawio.svg)
 
+## Vesper Control 通信协议
+
+见：[vesper control protocol](./doc/vesper-control-protocol.md)
+
 ## 参考
 
 * \[1\] Drew DeVault. The Wayland Protocol. [https://wayland-book.com/](https://wayland-book.com/)

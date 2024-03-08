@@ -29,7 +29,7 @@ build: prepare
 	cd target && mkdir -p asm-dump \
 	&& objdump -d ./vesper > asm-dump/vesper.text.asm \
 	&& objdump -D ./vesper > asm-dump/vesper.full.asm 
-	@echo -e "\033[32mbuild success.\033[0m"
+	@echo -e "\033[32mbuild success (vesper).\033[0m"
 
 
 .PHONY: clean

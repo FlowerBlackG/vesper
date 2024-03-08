@@ -9,11 +9,14 @@
 #include "Log.h"
 
 #include <ctime>
+#include <semaphore>
 
 using namespace std;
 
 namespace vesper {
 namespace log {
+
+binary_semaphore logLock {1};
     
 inline static void printLineInfo(const char* filename, int line) {
     clog << "[" 
@@ -39,10 +42,6 @@ inline static void printCurrentTime() {
 void printInfo(const char* filename, int line) {
     printCurrentTime();
     clog << " ";
-#if 0 //todo
-    printLineInfo(filename, line);
-    clog.put(' ');
-#endif
 }
 
 }

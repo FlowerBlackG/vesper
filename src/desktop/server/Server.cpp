@@ -562,15 +562,26 @@ static inline int64_t currTimeMsec() {
     }
 #endif // todo
 
-static int setResolutionAsyncCommandHandler(void* data) {
-    Server* server = wl_container_of(data, server, setResolutionAsyncArgs);
 
-    auto& args = server->setResolutionAsyncArgs;
+#define DECL_SERVER_ASYNC_COMMAND_HANDLER(command) \
+    static int command ## AsyncCommandHandler(void* data) \
+
+#define GET_SERVER(command) \
+    Server* server = wl_container_of(data, server, command ## AsyncArgs);
+
+#define GET_SERVER_AND_ARGS(command) \
+    GET_SERVER(command) \
+    auto& args = server->command ## AsyncArgs;
+
+
+
+DECL_SERVER_ASYNC_COMMAND_HANDLER(setResolution) {
+    GET_SERVER_AND_ARGS(setResolution)
 
     server->setResolutionAsyncArgsMutex.acquire();
 
     int currIdx = 0;
-    int resCode = -1;
+    
     Output* output;
     wl_list_for_each(output, &server->outputs, link) {
         if (args.index == currIdx++) {
@@ -579,7 +590,7 @@ static int setResolutionAsyncCommandHandler(void* data) {
             wlr_output_state_set_custom_mode(&state, args.width, args.height, args.refreshRate);
             
             if (wlr_output_commit_state(output->wlrOutput, &state)) {
-                resCode = 0;
+                // success
             }
 
             break;
@@ -594,12 +605,10 @@ static int setResolutionAsyncCommandHandler(void* data) {
 IMPL_SERVER_ASYNC_COMMAND_BRIDGE(setResolution)
 
 
-static int moveCursorAsyncCommandHandler(void* data) {
-    Server* server = wl_container_of(data, server, moveCursorAsyncArgs);
-    
+DECL_SERVER_ASYNC_COMMAND_HANDLER(moveCursor) {
+    GET_SERVER_AND_ARGS(moveCursor)
     auto& cursor = server->cursor;
-    auto& args = server->moveCursorAsyncArgs;
-
+    
     server->moveCursorAsyncArgsMutex.acquire();
 
     auto currTime = currTimeMsec();
@@ -626,10 +635,8 @@ static int moveCursorAsyncCommandHandler(void* data) {
 IMPL_SERVER_ASYNC_COMMAND_BRIDGE(moveCursor)
 
 
-static int pressMouseButtonAsyncCommandHandler(void* data) {
-    Server* server = wl_container_of(data, server, pressMouseButtonAsyncArgs);
-
-    auto& args = server->pressMouseButtonAsyncArgs;
+DECL_SERVER_ASYNC_COMMAND_HANDLER(pressMouseButton) {
+    GET_SERVER_AND_ARGS(pressMouseButton)
 
     uint32_t button = 0;
     server->pressMouseButtonAsyncArgsMutex.acquire();
@@ -661,11 +668,8 @@ static int pressMouseButtonAsyncCommandHandler(void* data) {
 IMPL_SERVER_ASYNC_COMMAND_BRIDGE(pressMouseButton)
 
 
-static int scrollAsyncCommandHandler(void* data) {
-    Server* server = wl_container_of(data, server, scrollAsyncArgs);
-
-    auto& args = server->scrollAsyncArgs;
-    
+DECL_SERVER_ASYNC_COMMAND_HANDLER(scroll) {
+    GET_SERVER_AND_ARGS(scroll)
     server->scrollAsyncArgsMutex.acquire();
 
     wlr_seat_pointer_notify_axis(
@@ -685,9 +689,8 @@ static int scrollAsyncCommandHandler(void* data) {
 IMPL_SERVER_ASYNC_COMMAND_BRIDGE(scroll)
 
 
-static int keyboardInputAsyncCommandHandler(void* data) {
-    Server* server = wl_container_of(data, server, keyboardInputAsyncArgs);
-    auto& args = server->keyboardInputAsyncArgs;
+DECL_SERVER_ASYNC_COMMAND_HANDLER(keyboardInput) {
+    GET_SERVER_AND_ARGS(keyboardInput)
 
     server->keyboardInputAsyncArgsMutex.acquire();
 
@@ -699,7 +702,7 @@ static int keyboardInputAsyncCommandHandler(void* data) {
 
     if (scancode) {
         wlr_keyboard_key_event event {
-            .time_msec = currTimeMsec(),
+            .time_msec = uint32_t(currTimeMsec()),
             .keycode = scancode,
             .update_state = false,
             .state = pressState,
@@ -754,7 +757,19 @@ static int keyboardInputAsyncCommandHandler(void* data) {
 
 IMPL_SERVER_ASYNC_COMMAND_BRIDGE(keyboardInput)
 
+DECL_SERVER_ASYNC_COMMAND_HANDLER(terminate) {
+    GET_SERVER(terminate)
+    server->terminate();
+    return 0;
+}
+
+IMPL_SERVER_ASYNC_COMMAND_BRIDGE(terminate)
+
 #undef IMPL_SERVER_ASYNC_COMMAND_BRIDGE
+#undef DECL_SERVER_ASYNC_COMMAND_HANDLER
+#undef GET_SERVER_AND_ARGS
+#undef GET_SERVER
+
 /* ============ 运行时，外部传入控制信息 结束 ============ */
 
 }

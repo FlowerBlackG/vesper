@@ -76,7 +76,9 @@ int Server::run() {
     options.result.code = 0;
     options.result.serverLaunchedSignal.release();
 
-    while (true) {
+    this->systemRunning = true;
+
+    while (systemRunning) {
         if (rfbServer->frameBuffer && options.screenBuffer.recycleBuffer) {
             options.screenBuffer.recycleBuffer(rfbServer->frameBuffer);
         }
@@ -101,6 +103,11 @@ void Server::clear() {
 
     mouseData.prevX = mouseData.prevY = -1;
     mouseData.prevButtonMask = 0;
+}
+
+
+void Server::terminate() {
+    this->systemRunning = false;
 }
 
 

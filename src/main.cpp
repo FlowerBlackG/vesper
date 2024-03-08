@@ -23,6 +23,7 @@
 #include "log/Log.h"
 #include "desktop/server/Server.h"
 #include "vnc/Server.h"
+#include "control/Server.h"
 
 #include "./utils/wlroots-cpp.h"
 #include "./common/MouseButton.h"
@@ -61,7 +62,7 @@ static void serverSetOptions(desktop::server::Server& server) {
     options.renderer.pixman = true;
 
     options.launch.apps.push_back("konsole");
-    //options.launch.apps.push_back("LIBGL_ALWAYS_SOFTWARE=1 kgx");
+    // todo: options.launch.apps.push_back("LIBGL_ALWAYS_SOFTWARE=1 kgx");
 
     options.output.alwaysRenderEntireScreen = true;
     options.output.exportScreenBuffer = true;
@@ -140,6 +141,18 @@ static void vncSetOptions(
 
 }
 
+static void controlSetOptions(
+    control::Server& control,
+    desktop::server::Server& desktop,
+    vnc::Server& vnc
+) {
+    auto& options = control.options;
+    options.socketPath = "/run/user/1000/vesper.sock"; // todo
+    options.hooks.terminateVesper = [&desktop] () {
+        desktop.terminateAsync();
+    };
+
+}
 
 int main(int argc, const char* argv[]) {
 
@@ -150,12 +163,18 @@ int main(int argc, const char* argv[]) {
     auto vncFramebufferFallback = unique_ptr<char[]>(new char[1280 * 720 * 4 * 10]());
     
     desktop::server::Server desktop;
+    vnc::Server vnc;
+    control::Server control;
+
+
     auto& desktopResult = desktop.options.result;
     serverSetOptions(desktop);
     
-    thread desktopThread([&desktop] () {
+    thread desktopThread([&desktop, &control, &vnc] () {
         int res = desktop.run();
         LOG_INFO("desktop server exited with code: ", res);
+        control.terminate();
+        vnc.terminate();
     });
     
     desktopResult.serverLaunchedSignal.acquire();
@@ -163,9 +182,10 @@ int main(int argc, const char* argv[]) {
     if (desktopResult.code) {
         LOG_ERROR("server failed with code: ", desktopResult.code);
         return -1;
+    } else {
+        LOG_INFO("desktop launched with code: ", desktopResult.code)
     }
 
-    vnc::Server vnc;
     auto& vncResult = vnc.options.result;
     vncSetOptions(vnc, desktop, vncFramebufferFallback.get());
 
@@ -175,6 +195,21 @@ int main(int argc, const char* argv[]) {
         LOG_INFO("vnc server exited with code: ", res);
     });
 
+    vncResult.serverLaunchedSignal.acquire();
+    LOG_INFO("vnc launched with code: ", vncResult.code)
+
+    auto& controlResult = control.options.result;
+    controlSetOptions(control, desktop, vnc);
+
+    thread controlThread([&control] () {
+        int res = control.run();
+        LOG_INFO("control server exited with code: ", res);
+    });
+
+    controlResult.serverLaunchedSignal.acquire();
+    LOG_INFO("control launched with code: ", controlResult.code)
+
+    controlThread.join();
     vncThread.join();
     desktopThread.join();
 

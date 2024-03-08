@@ -172,6 +172,11 @@ public:
     } keyboardInputAsyncArgs;
     int keyboardInputAsync();
 
+    struct {
+        char nothing; // 不需要参数。摆个东西在这里而已。
+    } terminateAsyncArgs;
+    int terminateAsync();
+
     /* ============ 对外方法 结束 ============ */
 
     /* ============ vesper desktop 模块内部使用 开始 ============ */

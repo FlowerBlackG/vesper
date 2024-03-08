@@ -13,11 +13,17 @@
 
 #include <iostream>
 #include <cstdlib>
+#include <semaphore>
 #include "../utils/ConsoleColorPad.h"
 
 
 namespace vesper {
 namespace log {
+
+extern std::binary_semaphore logLock;
+
+#define VESPER_LOG_MUTEX_LOCK() vesper::log::logLock.acquire();
+#define VESPER_LOG_MUTEX_UNLOCK() vesper::log::logLock.release();
 
 void printInfo(const char* filename, int line);
 
@@ -66,38 +72,49 @@ inline void setColorError() {
 
 #define LOG_INFO(...) \
     { \
+        VESPER_LOG_MUTEX_LOCK() \
         vesper::log::setColorInfo(); \
         LOG_PLAIN(__VA_ARGS__); \
         vesper::log::resetColor(); \
+        VESPER_LOG_MUTEX_UNLOCK() \
     }
 
 #define LOG_ERROR(...) \
     { \
+        VESPER_LOG_MUTEX_LOCK() \
         vesper::log::setColorError(); \
         LOG_PLAIN(__VA_ARGS__); \
         vesper::log::resetColor(); \
+        VESPER_LOG_MUTEX_UNLOCK() \
     }
 
 #define LOG_WARN(...) \
     { \
+        VESPER_LOG_MUTEX_LOCK() \
         vesper::log::setColorWarn(); \
         LOG_PLAIN(__VA_ARGS__); \
         vesper::log::resetColor(); \
+        VESPER_LOG_MUTEX_UNLOCK() \
     }
 
 #if 1
     #define LOG_TEMPORARY(...) { \
+        VESPER_LOG_MUTEX_LOCK() \
         ConsoleColorPad::setClogColor(128, 128, 255); \
         LOG_PLAIN(__VA_ARGS__); \
         vesper::log::resetColor(); \
+        VESPER_LOG_MUTEX_UNLOCK() \
     }
 #endif
 
 #if 1
     #define TODO(...) { \
+        VESPER_LOG_MUTEX_LOCK() \
         ConsoleColorPad::setClogColor(255, 192, 192); \
         LOG_PLAIN("TODO: ", __VA_ARGS__); \
         vesper::log::resetColor(); \
+        VESPER_LOG_MUTEX_UNLOCK() \
         exit(-1); \
     }
 #endif
+
