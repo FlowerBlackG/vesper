@@ -100,7 +100,15 @@ public:
          */
         struct {
 
-            std::binary_semaphore serverLaunchedSignal {0};
+            struct {
+                std::binary_semaphore serverLaunched {0};
+                std::binary_semaphore firstDisplayAttached {0};
+            } signals;
+
+            struct {
+                int width;
+                int height;
+            } firstDisplayResolution;
 
             int code;
             std::string msg;

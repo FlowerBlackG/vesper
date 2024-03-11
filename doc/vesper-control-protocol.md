@@ -21,7 +21,7 @@ vesper control 模块是外层控制 vesper 工作的重要窗口。
 +-------------------+
 ```
 
-* magic (uint32): 协议魔数。固定为 `{0x57, 0x64, 0x74, 0x4A} ` （注：从低地址到高地址依次代表的ASCII字符为  `WdtJ`）
+* magic (uint32): 协议魔数。固定为 `KpBL`
 * type (uint32): 指令识别码。见具体指令
 * length (uint64): 报文总长度（不含 header）
 

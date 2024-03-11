@@ -29,7 +29,8 @@ static void clearRunOptionsResult(Server::RunOptions& options) {
 
 int Server::run() {
 
-    clearRunOptionsResult(this->options);
+    auto& opts = this->options;
+    clearRunOptionsResult(opts);
 
     // prepare
 
@@ -40,7 +41,24 @@ int Server::run() {
         8, 3, 4 
     );
 
+    int framebufSize = opts.screenBuffer.width * opts.screenBuffer.height * 4;
+
+    this->framebufferFallback = new (nothrow) char [framebufSize];
+    if (this->framebufferFallback == nullptr) {
+        const char* err = "failed to allocate framebuffer fallback!";
+        LOG_ERROR(err);
+        opts.result.msg = err;
+        opts.result.code = -1;
+        this->clear();
+        return opts.result.code;
+    }
+
     rfbServer->frameBuffer = nullptr;
+    
+    if (opts.net.port >= 0) {
+        rfbServer->port = opts.net.port;
+    }
+
     rfbServer->alwaysShared = true;
     rfbServer->serverFormat = {
         .bitsPerPixel = 32,
@@ -55,6 +73,15 @@ int Server::run() {
         .blueShift = 0,
     };
 
+    if (opts.auth.password != "") {
+        rfbEncryptAndStorePasswd(
+            (char*) opts.auth.password.c_str(), 
+            (char*) opts.auth.libvncserverPasswdFile.c_str()
+        );
+
+        rfbServer->authPasswdData = (void*) opts.auth.libvncserverPasswdFile.c_str();
+    }
+
     rfbServer->ptrAddEvent = [] (int buttonMask, int x, int y, rfbClientPtr cl) {
         auto* p = (Server*) cl->screen->screenData;
         p->mouseEventHandler(buttonMask, x, y, cl);
@@ -66,7 +93,7 @@ int Server::run() {
     };
 
     rfbServer->screenData = this;
-    rfbServer->desktopName = "vesper remote - 2051565";
+    rfbServer->desktopName = "vesper remote";
 
     rfbInitServer(rfbServer);
 
@@ -79,10 +106,22 @@ int Server::run() {
     this->systemRunning = true;
 
     while (systemRunning) {
-        if (rfbServer->frameBuffer && options.screenBuffer.recycleBuffer) {
+        bool usingFramebufFallback = rfbServer->frameBuffer == framebufferFallback;
+
+        if (!usingFramebufFallback && rfbServer->frameBuffer && options.screenBuffer.recycleBuffer) {
             options.screenBuffer.recycleBuffer(rfbServer->frameBuffer);
         }
-        rfbServer->frameBuffer = (char*) options.screenBuffer.getBuffer();
+
+        if (options.screenBuffer.getBuffer) {
+            rfbServer->frameBuffer = (char*) options.screenBuffer.getBuffer();
+        } else {
+            rfbServer->frameBuffer = nullptr;
+        }
+
+        if (rfbServer->frameBuffer == nullptr) {
+            rfbServer->frameBuffer = this->framebufferFallback;
+        }
+
         rfbMarkRectAsModified(rfbServer, 0, 0, options.screenBuffer.width, options.screenBuffer.height);
         rfbProcessEvents(rfbServer, 50000);
     }
@@ -95,6 +134,11 @@ int Server::run() {
 }
 
 void Server::clear() {
+    if (this->framebufferFallback) {
+        delete[] this->framebufferFallback;
+        this->framebufferFallback = nullptr;
+    }
+
     if (this->rfbServer) {
         rfbShutdownServer(rfbServer, true);
         rfbScreenCleanup(rfbServer);

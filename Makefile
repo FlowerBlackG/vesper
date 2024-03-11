@@ -27,8 +27,7 @@ build: prepare
 	cd build && cmake --build . -- -j 8
 	mkdir -p target && cp build/vesper target/
 	cd target && mkdir -p asm-dump \
-	&& objdump -d ./vesper > asm-dump/vesper.text.asm \
-	&& objdump -D ./vesper > asm-dump/vesper.full.asm 
+	&& objdump -d ./vesper > asm-dump/vesper.text.asm
 	@echo -e "\033[32mbuild success (vesper).\033[0m"
 
 
@@ -38,9 +37,24 @@ clean:
 	rm -rf ./target
 
 
+.PHONY: run-no-args
+run-no-args: build
+	cd target && ./vesper
+
+
 .PHONY: run
 run: build
-	cd target && ./vesper
+	cd target && ./vesper \
+	--headless \
+	--add-virtual-display 720*720 \
+	--use-pixman-renderer \
+	--exec-cmds "2,7,7,konsoledolphin" \
+	--enable-vnc \
+	--vnc-auth-passwd 123456 \
+	--vnc-port 5900 \
+	--libvncserver-passwd-file vesper-vnc-passwd \
+	--enable-ctrl \
+	--ctrl-domain-socket vesper-ctrl.sock
 
 
 .PHONY: all

@@ -18,7 +18,7 @@
 
 namespace vesper::control::protocol {
 
-inline const char* MAGIC_STR = "WdtJ";
+inline const char* MAGIC_STR = "KpBL";
 inline const int HEADER_LEN = 16;
 
 #define VESPER_CTRL_PROTO_DECL_GET_TYPE() \

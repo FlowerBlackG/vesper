@@ -36,9 +36,11 @@ Wayland 图形合成器 & 窗口管理；VNC 远程桌面服务器。
 
 ![img](./doc/images/vesper-overview.drawio.svg)
 
-## Vesper Control 通信协议
+## 相关文档
 
-见：[vesper control protocol](./doc/vesper-control-protocol.md)
+[命令行参数说明](./doc/cmdline-args.md)
+
+[vesper control 通信协议](./doc/vesper-control-protocol.md)
 
 ## 参考
 

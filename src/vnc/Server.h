@@ -62,7 +62,17 @@ public:
             } keyboard;
             
         } eventHandlers;
-        
+
+        struct {
+            std::string password;
+            std::string libvncserverPasswdFile;
+        } auth;
+
+        struct {
+            /** -1 表示不设置。 */
+            int port = -1;
+        } net;
+
         struct {
 
             std::binary_semaphore serverLaunchedSignal {0};
@@ -92,6 +102,8 @@ public:
 protected:
     rfbScreenInfoPtr rfbServer = nullptr;
     bool systemRunning;
+
+    char* framebufferFallback = nullptr;
 
 
 };

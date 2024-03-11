@@ -174,7 +174,8 @@ static void clearRunOptionsResult(Server::RunOptions& options) {
     res.msg.clear();
     res.failedApps.clear();
 
-    res.serverLaunchedSignal.try_acquire();
+    res.signals.serverLaunched.try_acquire();
+    res.signals.firstDisplayAttached.try_acquire();
 }
 
 int Server::run() {
@@ -339,7 +340,7 @@ int Server::run() {
 
     // wayland event loop
 
-    options.result.serverLaunchedSignal.release();
+    options.result.signals.serverLaunched.release();
 
     wl_display_run(wlDisplay); // run blocking.
 
@@ -499,6 +500,10 @@ void Server::newOutputEventHandler(wlr_output* newOutput) {
         return;
     }
 
+
+    options.result.firstDisplayResolution.width = output->wlrOutput->width;
+    options.result.firstDisplayResolution.height = output->wlrOutput->height;
+    options.result.signals.firstDisplayAttached.release();
 }
 
 
@@ -538,7 +543,7 @@ static inline int64_t currTimeMsec() {
     return int64_t(currTime.tv_sec) * 1000 + currTime.tv_nsec / 1000000;
 }
 
-#if 0 // todo
+
 #define IMPL_SERVER_ASYNC_COMMAND_BRIDGE(command) \
     int Server::command ## Async() { \
         wl_event_source* event = wl_event_loop_add_timer( \
@@ -549,18 +554,6 @@ static inline int64_t currTimeMsec() {
         \
         return wl_event_source_timer_update(event, 1); \
     }
-#else // todo : 优化性能
-#define IMPL_SERVER_ASYNC_COMMAND_BRIDGE(command) \
-    int Server::command ## Async() { \
-        wl_event_source* event = wl_event_loop_add_timer( \
-            wl_display_get_event_loop(wlDisplay), \
-            command ## AsyncCommandHandler, \
-            &command ## AsyncArgs \
-        ); \
-        \
-        return wl_event_source_timer_update(event, 1); \
-    }
-#endif // todo
 
 
 #define DECL_SERVER_ASYNC_COMMAND_HANDLER(command) \
