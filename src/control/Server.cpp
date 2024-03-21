@@ -122,6 +122,8 @@ void Server::clear() {
         close(this->socketListenFd);
         this->socketListenFd = -1;
     }
+
+    unlink(options.socketPath.c_str());
 }
 
 

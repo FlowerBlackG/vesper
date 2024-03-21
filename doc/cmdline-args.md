@@ -14,6 +14,14 @@
 
 当此 flag 设置，且未设置 --version 时，将忽略其他所有命令行参数。
 
+### --daemonize
+
+以守护进程模式运行。
+
+### --no-color
+
+不要输出带颜色的日志信息。
+
 ## Vesper Desktop 参数
 
 ### --headless

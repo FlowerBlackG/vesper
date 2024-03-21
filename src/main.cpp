@@ -17,6 +17,8 @@
 #include <vector>
 #include <string>
 
+#include <signal.h>
+#include <fcntl.h>
 #include <unistd.h>
 
 #include <wlr/version.h>
@@ -34,6 +36,9 @@
 
 #include <pixman-1/pixman-version.h>
 #include <wayland-version.h>
+
+#include <sys/stat.h>
+#include <sys/wait.h>
 
 using namespace std;
 using namespace vesper;
@@ -68,6 +73,8 @@ static struct {
 static struct {
     bool enableVnc;
     bool enableControl;
+
+    bool daemonize;
 } options;
 
 static vector<thread> activeThreads;  
@@ -89,6 +96,9 @@ static void loadPredefinedArgKeys() {
         { "--usage", true },
         { "--help", true },
 
+        { "--daemonize", true },
+        { "--no-color", true },
+
         { "--headless", true },
         { "--add-virtual-display" },
         { "--use-pixman-renderer", true },
@@ -100,7 +110,8 @@ static void loadPredefinedArgKeys() {
         { "--libvncserver-passwd-file" },
 
         { "--enable-ctrl", true },
-        { "--ctrl-domain-socket" }
+        { "--ctrl-domain-socket" },
+        
     };
 
     for (unsigned int i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
@@ -464,6 +475,7 @@ static int buildOptions() {
 
     options.enableVnc = args.flags.contains("--enable-vnc");
     options.enableControl = args.flags.contains("--enable-ctrl");
+    options.daemonize = args.flags.contains("--daemonize");
 
     if (buildDesktopOptions()) {
         return 1;
@@ -490,6 +502,41 @@ static int buildOptions() {
 }
 
 
+/* ------------ 守护进程 ------------ */
+
+static int daemonize() {
+    pid_t pid = fork();
+    if (pid < 0) {
+        LOG_ERROR("failed to daemonize!");
+        return -1;
+    }
+
+    // 父进程结束运行。
+    if (pid != 0) {
+        exit(0);
+    }
+
+    // 创建新会话。
+    if ((pid = setsid()) < -1) {
+        LOG_ERROR("failed to set sid!");
+        return -1;
+    }
+
+    // 更改当前工作目录。
+    chdir("/");
+
+    umask(0);
+    signal(SIGTERM, [] (int arg) {
+        servers.desktop.terminateAsync();
+        servers.vnc.terminate();
+        servers.control.terminate();
+    });
+
+    return 0;
+}
+
+
+
 /* ------------ "析构函数" ------------ */
 
 static void cleanup() {
@@ -500,11 +547,16 @@ static void cleanup() {
 
 int main(int argc, const char* argv[], const char* env[]) {
 
+    ConsoleColorPad::disableColor();
+
     /* 命令行解析。 */
 
     if (int res = parseArgs(argc, argv)) {
+        usage();
         return res;
     }
+
+    ConsoleColorPad::setNoColor(args.flags.contains("--no-color"));
 
     processEnvVars(env);
 
@@ -515,6 +567,10 @@ int main(int argc, const char* argv[], const char* env[]) {
     if (int res = buildOptions()) { 
         usage(); 
         return res; 
+    }
+
+    if (options.daemonize) {
+        daemonize();
     }
 
     version(true);

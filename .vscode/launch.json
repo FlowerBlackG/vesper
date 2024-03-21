@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) Launch",
+            "name": "(gdb) Launch - headless",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/target/vesper",
@@ -19,7 +19,36 @@
                 "--vnc-port", "5900",
                 "--libvncserver-passwd-file", "vesper-vnc-passwd",
                 "--enable-ctrl",
-                "--ctrl-domain-socket", "vesper-ctrl.sock"
+                "--ctrl-domain-socket", "vesper.sock"
+            ],
+            "cwd": "${workspaceFolder}/target",
+            "environment": [],
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "pretty-print gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "miDebuggerPath": "/usr/bin/gdb"
+
+        },
+
+        {
+            "name": "(gdb) Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/target/vesper",
+            "args": [
+                "--use-pixman-renderer",
+                "--exec-cmds", "2,7,7,konsoledolphin",
+                "--enable-vnc",
+                "--vnc-auth-passwd", "123456",
+                "--vnc-port", "5900",
+                "--libvncserver-passwd-file", "vesper-vnc-passwd",
+                "--enable-ctrl",
+                "--ctrl-domain-socket", "vesper.sock"
             ],
             "cwd": "${workspaceFolder}/target",
             "environment": [],

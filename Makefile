@@ -45,16 +45,25 @@ run-no-args: build
 .PHONY: run
 run: build
 	cd target && ./vesper \
-	--headless \
-	--add-virtual-display 720*720 \
-	--use-pixman-renderer \
-	--exec-cmds "2,7,7,konsoledolphin" \
-	--enable-vnc \
-	--vnc-auth-passwd 123456 \
-	--vnc-port 5900 \
-	--libvncserver-passwd-file vesper-vnc-passwd \
-	--enable-ctrl \
-	--ctrl-domain-socket vesper-ctrl.sock
+		--add-virtual-display 720*720 \
+		--use-pixman-renderer \
+		--exec-cmds "2,7,7,konsoledolphin" \
+		--enable-vnc \
+		--vnc-auth-passwd 123456 \
+		--vnc-port 5900 \
+		--libvncserver-passwd-file vesper-vnc-passwd \
+		--enable-ctrl \
+		--ctrl-domain-socket vesper.sock
+
+
+.PHONY: install
+install: build
+	cp target/vesper /usr/sbin/vesper
+
+
+.PHONY: uninstall
+uninstall:
+	rm -f /usr/sbin/vesper
 
 
 .PHONY: all
