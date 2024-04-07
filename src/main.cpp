@@ -98,6 +98,8 @@ static void loadPredefinedArgKeys() {
 
         { "--daemonize", true },
         { "--no-color", true },
+        { "--log-to", false },
+
 
         { "--headless", true },
         { "--add-virtual-display" },
@@ -557,6 +559,10 @@ int main(int argc, const char* argv[], const char* env[]) {
     }
 
     ConsoleColorPad::setNoColor(args.flags.contains("--no-color"));
+    if (args.values.contains("--log-to")) {
+        string& logTo = args.values["--log-to"];
+        freopen(logTo.c_str(), "w", stderr);
+    }
 
     processEnvVars(env);
 

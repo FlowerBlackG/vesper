@@ -22,6 +22,12 @@
 
 不要输出带颜色的日志信息。
 
+### --log-to [value]
+
+将日志输出到指定地点（如指定文件）。
+
+value: 目标文件路径。
+
 ## Vesper Desktop 参数
 
 ### --headless
