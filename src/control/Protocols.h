@@ -16,6 +16,13 @@
     #define __packed __attribute__((packed))
 #endif
 
+
+#define VESPER_CTRL_EXPAND_RECV_PROTOS(macro) \
+    macro(TerminateVesper) \
+    macro(GetVNCPort) \
+    macro(GetVNCPassword)
+
+
 namespace vesper::control::protocol {
 
 inline const char* MAGIC_STR = "KpBL";
@@ -61,6 +68,30 @@ public:
 
 protected:
 
+
+};
+
+
+class GetVNCPort : public Base {
+public:
+    static const uint32_t typeCode = 0x0101;
+    VESPER_CTRL_PROTO_DECL_GET_TYPE()
+
+    virtual int decodeBody(const char* data, int len) override;
+
+protected:
+
+};
+
+
+class GetVNCPassword : public Base {
+public:
+    static const uint32_t typeCode = 0x0102;
+    VESPER_CTRL_PROTO_DECL_GET_TYPE()
+
+    virtual int decodeBody(const char* data, int len) override;
+
+protected:
 
 };
 

@@ -87,15 +87,36 @@ int TerminateVesper::decodeBody(const char* data, int len) {
 }
 
 
+VESPER_CTRL_PROTO_IMPL_GET_TYPE(GetVNCPort)
+
+int GetVNCPort::decodeBody(const char* data, int len) {
+    return 0;
+}
+
+
+VESPER_CTRL_PROTO_IMPL_GET_TYPE(GetVNCPassword)
+
+int GetVNCPassword::decodeBody(const char* data, int len) {
+    return 0;
+}
+
+
 Base* decode(const char* data, uint32_t type, int len) {
 
     Base* p = nullptr;
 
-    if (type == TerminateVesper::typeCode) {
-        p = new (nothrow) TerminateVesper;
-    } else {
-        LOG_WARN("type code ", type, "matches no protocols.");
+#define TRY_MATCH(ProtoType) case ProtoType::typeCode: { p = new (nothrow) ProtoType; break; }
+
+    switch (type) {
+        VESPER_CTRL_EXPAND_RECV_PROTOS(TRY_MATCH)
+
+        default: {
+            LOG_WARN("type code ", type, "matches no protocols.");
+            break;
+        }
     }
+
+#undef TRY_MATCH
 
     if (p && p->decodeBody(data + HEADER_LEN, len - HEADER_LEN)) {
         delete p;

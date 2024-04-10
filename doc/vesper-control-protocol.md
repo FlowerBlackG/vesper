@@ -25,7 +25,7 @@ vesper control 模块是外层控制 vesper 工作的重要窗口。
 * type (uint32): 指令识别码。见具体指令
 * length (uint64): 报文总长度（不含 header）
 
-## 通用返回格式
+## 0xA001: 通用返回格式
 
 `Response`
 
@@ -50,7 +50,7 @@ vesper control 模块是外层控制 vesper 工作的重要窗口。
 
 通用返回报文可以用于传递数据。当 code 非 0 时，数据内容仅作为报错信息；当 code 为 0 时，msg 的含义与解析方式依不同协议而不同。
 
-## 关闭 vesper
+## 0x0001: 关闭 vesper
 
 `TerminateVesper`
 
@@ -66,3 +66,33 @@ vesper control 模块是外层控制 vesper 工作的重要窗口。
 * type (uint32): `0x0001`
 
 该指令正确执行后，vesper 会返回一个空 response 报文（当然，返回报文的 code 应该是 0）。
+
+## 0x0101: 读取 VNC 端口
+
+`GetVNCPort`
+
+```
+    8 Bytes
++----------------+
+|     header     |
++----------------+
+|     header     |
++----------------+
+```
+
+response: msg 为用字符串表示的端口号
+
+## 0x0102: 读取 VNC 密码
+
+`GetVNCPassword`
+
+```
+    8 Bytes
++----------------+
+|     header     |
++----------------+
+|     header     |
++----------------+
+```
+
+response: msg 为一个字符串

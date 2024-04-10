@@ -12,10 +12,9 @@
 #include <string>
 #include <functional>
 
-namespace vesper::control {
+#include "./Protocols.h"
 
-namespace protocol { class Base; }
-namespace protocol { class TerminateVesper; }
+namespace vesper::control {
 
 
 class Server {
@@ -38,6 +37,8 @@ public:
 
         struct {
             std::function<void ()> terminateVesper;
+            std::function<const int ()> getVNCPort;
+            std::function<const std::string& ()> getVNCPassword;
         } hooks = {0};
 
         struct {
@@ -70,6 +71,8 @@ protected:
     /* ------ protocol processors ------ */
 
     int processTerminateVesper(protocol::TerminateVesper*, int connFd);
+    int processGetVNCPort(protocol::GetVNCPort*, int connFd);
+    int processGetVNCPassword(protocol::GetVNCPassword*, int connFd);
 
 protected:
     char* socketDataBuf = nullptr;

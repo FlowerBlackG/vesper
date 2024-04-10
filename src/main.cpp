@@ -461,6 +461,15 @@ static int buildControlOptions() {
         servers.vnc.terminate();
     };
 
+    options.hooks.getVNCPort = [&] () {
+        return servers.vnc.options.net.port;
+    };
+
+
+    options.hooks.getVNCPassword = [&] () -> string& {
+        return servers.vnc.options.auth.password;
+    };
+
     return 0;
 }
 

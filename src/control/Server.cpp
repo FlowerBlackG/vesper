@@ -247,16 +247,32 @@ int Server::acceptClient() {
 int Server::processProtocol(protocol::Base* protocol, int connFd) {
     auto protocolType = protocol->getType();
 
-    if (protocolType == protocol::TerminateVesper::typeCode) {
-        return processTerminateVesper((protocol::TerminateVesper*) protocol, connFd);
-    } else {
-        LOG_ERROR("protocol type unrecognized: ", protocolType);
-        return 1;
+#define TRY_PROCESS(ProtoType) \
+    case protocol::ProtoType::typeCode: { \
+        return process ## ProtoType((protocol::ProtoType*) protocol, connFd); \
     }
+
+    switch (protocolType) {
+        VESPER_CTRL_EXPAND_RECV_PROTOS(TRY_PROCESS)
+
+        default: {
+            LOG_ERROR("protocol type unrecognized: ", protocolType);
+            return 1;
+        }
+    }
+
+#undef TRY_PROCESS
+    
 }
 
 
 /* ------ protocol processors ------ */
+
+// 函数返回：
+//   > 0 : *正常* 返回，*愿意* 接收新报文
+//   = 0 : *正常* 返回，*拒绝* 接收新报文
+//   < 0 : *异常* 返回，*拒绝* 接收新报文
+
 
 int Server::processTerminateVesper(protocol::TerminateVesper*, int connFd) {
 
@@ -270,6 +286,34 @@ int Server::processTerminateVesper(protocol::TerminateVesper*, int connFd) {
 
     return 0;
 }
+
+
+int Server::processGetVNCPort(protocol::GetVNCPort*, int connFd) {
+
+    if (options.hooks.getVNCPort) {
+        sendResponse(connFd, 0, to_string(options.hooks.getVNCPort()));
+    } else {
+        sendResponse(connFd, -1, "VNC is not active");
+    }
+
+    return 1;
+}
+
+
+
+int Server::processGetVNCPassword(protocol::GetVNCPassword*, int connFd) {
+
+    if (options.hooks.getVNCPassword) {
+        sendResponse(connFd, 0, options.hooks.getVNCPassword());
+    } else {
+        sendResponse(connFd, -1, "VNC is not active");
+    }
+    
+
+    return 1;
+}
+
+
 
 
 } // namespace vesper::control
