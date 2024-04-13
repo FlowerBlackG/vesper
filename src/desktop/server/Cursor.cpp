@@ -206,7 +206,9 @@ void Cursor::processResize(uint32_t timeMsec) {
     );
 }
 
-void Cursor::buttonEventHandler(uint32_t timeMsec, uint32_t button, wlr_button_state state) {
+void Cursor::buttonEventHandler(
+    uint32_t timeMsec, uint32_t button, wl_pointer_button_state state
+) {
 
     wlr_seat_pointer_notify_button(server->wlrSeat, timeMsec, button, state);
 
@@ -216,10 +218,10 @@ void Cursor::buttonEventHandler(uint32_t timeMsec, uint32_t button, wlr_button_s
         wlrCursor->x, wlrCursor->y, &surface, &sx, &sy
     );
 
-    if (state == WLR_BUTTON_RELEASED) {
+    if (state == WL_POINTER_BUTTON_STATE_RELEASED) {
         this->cursorMode = Cursor::Mode::PASSTHROUGH;
         this->grabbedView = nullptr;
-    } else if (state == WLR_BUTTON_PRESSED) {
+    } else if (state == WL_POINTER_BUTTON_STATE_PRESSED) {
         if (view) {
             view->focus(surface);
         }

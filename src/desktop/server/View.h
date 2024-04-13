@@ -57,6 +57,7 @@ public:
         wl_listener map;
         wl_listener unmap;
         wl_listener destroy;
+        wl_listener commit;
         wl_listener requestMove;
         wl_listener requestResize;
         wl_listener requestMaximize;

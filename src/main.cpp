@@ -307,7 +307,7 @@ static int buildDesktopOptions() {
                 pos = execCmds.find(',');
                 size_t len;
                 if (n == 0) {
-                    pos = stoi(execCmds);
+                    len = stoi(execCmds);
                 } else if (pos == string::npos) {
                     throw 0;
                 } else {

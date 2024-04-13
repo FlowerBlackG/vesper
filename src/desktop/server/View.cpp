@@ -49,6 +49,14 @@ static void xdgToplevelUnmapEventBridge(wl_listener* listener, void* data) {
     wl_list_remove(&view->link);
 }
 
+static void xdgToplevelCommitEventBridge(wl_listener* listener, void* data) {
+    View* view = wl_container_of(listener, view, eventListeners.commit);
+
+    if (view->wlrXdgToplevel->base->initial_commit) {
+        wlr_xdg_toplevel_set_size(view->wlrXdgToplevel, 0, 0);
+    }
+}
+
 static void xdgToplevelDestroyEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.destroy);
 
@@ -152,8 +160,12 @@ int View::init(const CreateOptions& options) {
     eventListeners.unmap.notify = xdgToplevelUnmapEventBridge;
     wl_signal_add(&wlrXdgSurface->surface->events.unmap, &eventListeners.unmap);
 
+    eventListeners.commit.notify = xdgToplevelCommitEventBridge;
+    wl_signal_add(&wlrXdgSurface->surface->events.commit, &eventListeners.commit);
+
     eventListeners.destroy.notify = xdgToplevelDestroyEventBridge;
     wl_signal_add(&wlrXdgSurface->surface->events.destroy, &eventListeners.destroy);
+
 
     auto* topLevel = wlrXdgSurface->toplevel;
 

@@ -407,6 +407,11 @@ void Server::clear() {
 }
 
 void* Server::getFramebuffer(int displayIndex) {
+
+    if (!wlr_renderer_is_pixman(wlrRenderer)) {
+        return nullptr;  // only support pixman's framebuffer.
+    }
+
     int currIdx = -1;
     Output* serverOutput;
     wl_list_for_each(serverOutput, &this->outputs, link) {
@@ -647,7 +652,7 @@ DECL_SERVER_ASYNC_COMMAND_HANDLER(pressMouseButton) {
         server->cursor->buttonEventHandler(
             currTimeMsec(), 
             button, 
-            args.press ? WLR_BUTTON_PRESSED : WLR_BUTTON_RELEASED
+            args.press ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED
         );
         wlr_seat_pointer_notify_frame(server->wlrSeat);
     }
@@ -667,9 +672,9 @@ DECL_SERVER_ASYNC_COMMAND_HANDLER(scroll) {
 
     wlr_seat_pointer_notify_axis(
         server->wlrSeat, currTimeMsec(), 
-        args.vertical ? WLR_AXIS_ORIENTATION_VERTICAL : WLR_AXIS_ORIENTATION_HORIZONTAL,
-        args.delta, args.deltaDiscrete, WLR_AXIS_SOURCE_WHEEL,
-        WLR_AXIS_RELATIVE_DIRECTION_IDENTICAL
+        args.vertical ? WL_POINTER_AXIS_VERTICAL_SCROLL : WL_POINTER_AXIS_HORIZONTAL_SCROLL,
+        args.delta, args.deltaDiscrete, WL_POINTER_AXIS_SOURCE_WHEEL,
+        WL_POINTER_AXIS_RELATIVE_DIRECTION_IDENTICAL
     );
 
     server->scrollAsyncArgsMutex.release();
