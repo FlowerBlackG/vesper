@@ -319,7 +319,9 @@ int Server::run() {
 
     LOG_INFO("running wayland display with socket: ", socket);
 
-    setenv("WAYLAND_DISPLAY", socket, true); 
+    setenv("WAYLAND_DISPLAY", socket, true);
+    setenv("XDG_SESSION_TYPE", "wayland", true);
+    setenv("XDG_SESSION_DESKTOP", "Vesper", true);
 
     // launch apps
 
