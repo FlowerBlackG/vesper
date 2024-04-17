@@ -21,12 +21,6 @@ static void treeDestroyEventBridge(wl_listener* listener, void* data) {
         listener, sceneXdgSurface, eventListeners.treeDestroy
     );
 
-    wl_list_remove(&sceneXdgSurface->eventListeners.treeDestroy.link);
-    wl_list_remove(&sceneXdgSurface->eventListeners.xdgSurfaceDestroy.link);
-    wl_list_remove(&sceneXdgSurface->eventListeners.xdgSurfaceMap.link);
-    wl_list_remove(&sceneXdgSurface->eventListeners.xdgSurfaceUnmap.link);
-    wl_list_remove(&sceneXdgSurface->eventListeners.xdgSurfaceCommit.link);
-
     delete sceneXdgSurface;
 }
 
@@ -108,7 +102,11 @@ int XdgSurface::init(const CreateOptions& options) {
 }
 
 XdgSurface::~XdgSurface() {
-
+    wl_list_remove(&this->eventListeners.treeDestroy.link);
+    wl_list_remove(&this->eventListeners.xdgSurfaceDestroy.link);
+    wl_list_remove(&this->eventListeners.xdgSurfaceMap.link);
+    wl_list_remove(&this->eventListeners.xdgSurfaceUnmap.link);
+    wl_list_remove(&this->eventListeners.xdgSurfaceCommit.link);
 }
 
 

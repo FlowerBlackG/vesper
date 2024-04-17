@@ -25,9 +25,15 @@ public:
 
     ~Region32();
 
+    void clear();
+
 
     bool empty();
     bool notEmpty();
+
+    bool intersectWith(const pixman_region32_t* other);
+    bool intersectWith(const pixman_region32_t& other);
+    bool intersectWith(const Region32& other);
 
     bool intersectRect(
         Region32& source, int x, int y, unsigned int width, unsigned int height
@@ -54,12 +60,16 @@ public:
     bool subtract(Region32& m, pixman_region32_t* s);
     bool subtract(pixman_region32_t* m, pixman_region32_t* s);
 
+    void translate(int x, int y);
+
     pixman_box32_t* rectangles(int* nRects);
+    const pixman_box32_t* rectangles(int* nRects) const;
     uint32_t regionArea();
 
 public:
 
-    Region32& operator = (const Region32&) = delete;
+    Region32& operator = (const Region32& other);
+    Region32& operator = (const pixman_region32_t* other);
 
     Region32& operator -= (const Region32& other);
     Region32& operator -= (const pixman_region32_t* other);
@@ -67,6 +77,7 @@ public:
     Region32& operator += (const Region32& other);
     Region32& operator += (const pixman_region32_t* other);
     Region32& operator += (const pixman_region32_t& other);
+    Region32& operator += (const pixman_box32_t& other);
 
     bool operator == (const Region32& other) const;
     bool operator == (const pixman_region32_t* other) const;

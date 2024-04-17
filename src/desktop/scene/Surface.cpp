@@ -220,7 +220,7 @@ void Surface::reconfigure() {
             bufferWidth, bufferHeight
         );
 
-        pixman_region32_translate(opaque.raw(), -clip->x, -clip->y);
+        opaque.translate(-clip->x, -clip->y);
         opaque.intersectRect(opaque, 0, 0, width, height);
     }
 
@@ -229,7 +229,7 @@ void Surface::reconfigure() {
         return;
     }
 
-    sceneBuffer->setOpaqueRegion(opaque.raw());
+    sceneBuffer->setOpaqueRegion(opaque);
     sceneBuffer->setSourceBox(&srcBox);
     sceneBuffer->setDstSize(width, height);
     sceneBuffer->setTransform(state->transform);

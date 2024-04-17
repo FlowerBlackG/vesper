@@ -110,9 +110,11 @@ public:
 
 
     struct FramebufferPlate {
+    protected:
         struct {
             wlr_buffer* buf = nullptr;
             std::binary_semaphore lock {1};
+            vesper::bindings::pixman::Region32 damage;
         } buf;
 
         struct {
@@ -120,10 +122,12 @@ public:
             std::binary_semaphore lock {1};
         } recycleBin;
 
+
+    public:
         ~FramebufferPlate();
         void recycle(wlr_buffer*);
-        wlr_buffer* get();
-        void put(wlr_buffer*);
+        wlr_buffer* get(vesper::bindings::pixman::Region32& damage);
+        void put(wlr_buffer*, const vesper::bindings::pixman::Region32& damage);
 
     } framebufferPlate;
 

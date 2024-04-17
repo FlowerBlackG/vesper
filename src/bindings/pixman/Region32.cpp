@@ -39,6 +39,10 @@ Region32::~Region32() {
     pixman_region32_fini(raw());
 }
 
+void Region32::clear() {
+    pixman_region32_clear(raw());
+}
+
 
 bool Region32::empty() {
     return !!pixman_region32_empty(raw());
@@ -47,6 +51,18 @@ bool Region32::empty() {
 
 bool Region32::notEmpty() {
     return !!pixman_region32_not_empty(raw());
+}
+
+bool Region32::intersectWith(const pixman_region32_t* other) {
+    return !!pixman_region32_intersect(raw(), raw(), other);
+}
+
+bool Region32::intersectWith(const pixman_region32_t& other) {
+    return !!pixman_region32_intersect(raw(), raw(), &other);
+}
+
+bool Region32::intersectWith(const Region32& other) {
+    return !!pixman_region32_intersect(raw(), raw(), other.raw());
 }
 
 
@@ -105,7 +121,15 @@ bool Region32::subtract(pixman_region32_t* m, pixman_region32_t* s) {
 }
 
 
+void Region32::translate(int x, int y) {
+    pixman_region32_translate(raw(), x, y);
+}
+
 pixman_box32_t* Region32::rectangles(int* nRects) {
+    return pixman_region32_rectangles(raw(), nRects);
+}
+
+const pixman_box32_t* Region32::rectangles(int* nRects) const {
     return pixman_region32_rectangles(raw(), nRects);
 }
 
@@ -121,6 +145,19 @@ uint32_t Region32::regionArea() {
 
     return area;
 }
+
+
+Region32& Region32::operator = (const Region32& other) {
+    pixman_region32_copy(raw(), other.raw());
+    return *this;
+}
+
+
+Region32& Region32::operator = (const pixman_region32_t* other) {
+    pixman_region32_copy(raw(), other);
+    return *this;
+}
+
 
 Region32& Region32::operator -= (const Region32& other) {
     pixman_region32_subtract(raw(), raw(), other.raw());
@@ -151,6 +188,18 @@ Region32& Region32::operator += (const pixman_region32_t* other) {
 
 Region32& Region32::operator += (const pixman_region32_t& other) {
     pixman_region32_union(raw(), raw(), &other);
+    return *this;
+}
+
+
+Region32& Region32::operator += (const pixman_box32_t& other) {
+    pixman_region32_union_rect(
+        raw(), raw(), 
+        other.x1, 
+        other.y1, 
+        other.x2 - other.x1, 
+        other.y2 - other.y1
+    );
     return *this;
 }
 

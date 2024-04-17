@@ -18,6 +18,8 @@
 #include <rfb/rfb.h>
 #include <xkbcommon/xkbcommon.h>
 
+#include "../bindings/pixman.h"
+
 
 namespace vesper::vnc {
 
@@ -34,7 +36,7 @@ public:
         struct {
             int width;
             int height;
-            std::function<void* ()> getBuffer;
+            std::function<void* (vesper::bindings::pixman::Region32& damage)> getBuffer;
             std::function<void (void*)> recycleBuffer;
         } screenBuffer;
 
@@ -104,7 +106,7 @@ protected:
     bool systemRunning;
 
     char* framebufferFallback = nullptr;
-
+    vesper::bindings::pixman::Region32 frameDamage;
 
 };
 

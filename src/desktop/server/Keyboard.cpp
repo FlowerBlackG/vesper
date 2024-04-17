@@ -67,7 +67,7 @@ static wlr_keyboard* createPuyiKeyboard() {
     memset(keyboard, 0, sizeof(wlr_keyboard));
 
     wlr_keyboard_init(keyboard, &puyiKeyboardImpl, "vesper Puyi keyboard");
-    return keyboard; // todo: 释放内存。
+    return keyboard;
 }
 
 
@@ -80,7 +80,8 @@ int Keyboard::init(const CreateOptions& options) {
     if (options.wlrKeyboard) {
         this->wlrKeyboard = options.wlrKeyboard;
         wl_list_init(&eventListeners.puyiKeyboardDestroy.link);
-    } else {
+    } else {  // should create Puyi keyboard.
+    
         this->wlrKeyboard = createPuyiKeyboard();
         if (wlrKeyboard == nullptr) {
             LOG_ERROR("failed to create Puyi Keyboard (virtual keyboard agent)!");

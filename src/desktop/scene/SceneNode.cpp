@@ -789,7 +789,7 @@ void SceneBufferNode::setBuffer(wlr_buffer* wlrBuffer, pixman_region32_t* damage
         
         scaleOutputDamage(cullRegion.raw(), outputScale);
         pixman_region32_translate(cullRegion.raw(), -lx * outputScale, -ly * outputScale);
-        pixman_region32_intersect(outputDamage.raw(), outputDamage.raw(), cullRegion.raw());
+        outputDamage.intersectWith(cullRegion);
 
         pixman_region32_translate(
             outputDamage.raw(),
@@ -846,7 +846,7 @@ void SceneBufferNode::setOpaqueRegion(pixman_region32_t* opaque) {
         return;
     }
 
-    pixman_region32_copy(this->opaqueRegion.raw(), opaque);
+    this->opaqueRegion = opaque;
 
     int x, y;
     if (!this->coords(&x, &y)) {

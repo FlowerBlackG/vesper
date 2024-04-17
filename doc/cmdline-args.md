@@ -57,18 +57,22 @@ width 和 height 需要是合理的整数。
 cmds 格式如下：
 
 ```bash
-N,A1,A2,...,An,c1c2c3...cn
+CMD1,CMD2,CMD3,...
 ```
 
-* N: 指令总数。需要能够用 int32 表示；
-* Ai: 第 i 条指令的长度；
-* ci: 第 i 条指令的内容。注意，不同指令之间不要有空格等分割的符号。粘着就行。
+即，启动命令之间以 `,` 隔开。
 
 例：
 
 ```bash
-./vesper --exec-cmds "2,7,27,konsoleLIBGL_ALWAYS_SOFTWARE=1 kgx"
+./vesper --exec-cmds "konsole, dolphin, LIBGL_ALWAYS_SOFTWARE=1 kgx"
 ```
+
+如果启动命令中包含 `,` ，可加入一个 `+` 来转译。
+
+如果启动命令中包含 `+` ，则可在其前加入一个 `+` 来转译。若单个 `+` 之后跟随的不是 `,`，其也会被正常当作一个 `+` 识别。
+
+`,` 前后的空格会被忽略。
 
 ## Vesper VNC 参数
 

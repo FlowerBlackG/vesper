@@ -16,13 +16,18 @@
 #include "../../utils/XKeysymToEvdevScancode.h"
 #include "../../common/MouseButton.h"
 #include "./View.h"
+#include "./Popup.h"
 #include "../scene/Scene.h"
 #include "../scene/Output.h"
 #include "../scene/SceneNode.h"
 #include "../scene/XdgShell.h"
 #include "../scene/Surface.h"
+#include "../../bindings/pixman.h"
 
+#include <signal.h>
 #include <unistd.h>
+#include <fcntl.h>
+
 #include <thread>
 
 #include <linux/input-event-codes.h>
@@ -30,6 +35,7 @@
 using namespace std;
 using namespace vesper::desktop;
 using namespace vesper::common;
+using namespace vesper::bindings;
 
 namespace vesper::desktop::server {
 
@@ -63,6 +69,7 @@ static void newXdgToplevelEventBridge(wl_listener* listener, void* data) {
 
 }
 
+
 /**
  * 创建新“气泡”时触发。
  * 气泡例：打开的一个浮动菜单。
@@ -74,28 +81,17 @@ static void newXdgPopupEventBridge(wl_listener* listener, void* data) {
 
     Server* server = wl_container_of(listener, server, eventListeners.newXdgPopup);
 
-    auto* xdgPopup = (wlr_xdg_popup*) data;
+    auto* wlrXdgPopup = (wlr_xdg_popup*) data;
 
-    wlr_xdg_surface* parent = wlr_xdg_surface_try_from_wlr_surface(xdgPopup->parent);
-
-    if (!parent) {
-        LOG_ERROR("no parent for popup!");
-        return;
-    }
-
-    auto* parentTree = (scene::SceneTreeNode*) parent->data;
-
-    auto* sceneXdgSurface = scene::XdgSurface::create({
-        .parent = parentTree,
-        .wlrXdgSurface = xdgPopup->base
+    Popup* popup = Popup::create({
+        .server = server,
+        .xdgPopup = wlrXdgPopup
     });
-    
-    if (sceneXdgSurface == nullptr) {
-        LOG_ERROR("failed to create xdg surface!");
+
+    if (!popup) {
+        LOG_ERROR("failed to allocate Popup object!");
         return;
     }
-
-    xdgPopup->base->data = sceneXdgSurface->tree;
 }
 
 
@@ -408,7 +404,7 @@ void Server::clear() {
 
 }
 
-void* Server::getFramebuffer(int displayIndex) {
+void* Server::getFramebuffer(int displayIndex, pixman::Region32& damage) {
 
     if (!wlr_renderer_is_pixman(wlrRenderer)) {
         return nullptr;  // only support pixman's framebuffer.
@@ -429,7 +425,7 @@ void* Server::getFramebuffer(int displayIndex) {
 
     auto& plate = serverOutput->sceneOutput->framebufferPlate;
 
-    wlr_buffer* wlrBuf = plate.get();
+    wlr_buffer* wlrBuf = plate.get(damage);
     if (!wlrBuf) {
         return nullptr;
     }
@@ -623,10 +619,6 @@ DECL_SERVER_ASYNC_COMMAND_HANDLER(moveCursor) {
 
     Output* output = wl_container_of(server->outputs.next, output, link);
 
-    scene::Output* sceneOutput = server->scene->getSceneOutput(output->wlrOutput);
-    
-    sceneOutput->updateGeometry(true);
-
     server->moveCursorAsyncArgsMutex.release();
 
     return 0;
@@ -772,4 +764,4 @@ IMPL_SERVER_ASYNC_COMMAND_BRIDGE(terminate)
 
 /* ============ 运行时，外部传入控制信息 结束 ============ */
 
-}
+}  // namespace vesper::desktop::server

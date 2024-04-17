@@ -308,7 +308,7 @@ static void sceneEntryRender(Output::RenderListEntry& entry, const RenderData& d
     pixman::Region32 renderRegion = node->visibleArea;
     pixman_region32_translate(renderRegion.raw(), -data.logical.x, -data.logical.y);
     scaleOutputDamage(renderRegion.raw(), data.scale);
-    pixman_region32_intersect(renderRegion.raw(), renderRegion.raw(), &data.damage);
+    renderRegion.intersectWith(data.damage);
     if (renderRegion.empty() && false) { // todo
         return;
     }
@@ -397,7 +397,7 @@ static void forceRenderSoftwareCursorToRenderPass(
     };
     
     if (damage) {
-        pixman_region32_intersect(renderDamage.raw(), renderDamage.raw(), damage);
+        renderDamage.intersectWith(damage);
     }
 
     wlr_output_cursor* cursor;
@@ -419,7 +419,7 @@ static void forceRenderSoftwareCursorToRenderPass(
         };
 
         pixman::Region32 cursorDamage = box;
-        pixman_region32_intersect(cursorDamage.raw(), cursorDamage.raw(), renderDamage.raw());
+        cursorDamage.intersectWith(renderDamage);
 
         if (cursorDamage.empty()) {
             continue;
@@ -558,9 +558,12 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
 
     renderData.wlrRenderPass = renderPass;
 
-    pixman_region32_init(&renderData.damage);
-    wlr_damage_ring_rotate_buffer(&wlrDamageRing, buffer, &renderData.damage);
+    // 先取出整个需要重新渲染的区域
+    
+    wlr_damage_ring_rotate_buffer(&wlrDamageRing, buffer, renderData.damage.raw());
 
+
+    // 假设要为整个重渲染区域绘制 background
     pixman::Region32 background = renderData.damage;
 
     if (this->scene->calculateVisibility) {
@@ -569,24 +572,24 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
 
             pixman::Region32 opaque;
             entry.node->opaqueRegion(entry.x, entry.y, opaque.raw());
-            pixman_region32_intersect(opaque.raw(), opaque.raw(), entry.node->visibleArea.raw());
+            opaque.intersectWith(entry.node->visibleArea);
 
             pixman_region32_translate(opaque.raw(), -position.x, -position.y);
             wlr_region_scale(opaque.raw(), opaque.raw(), renderData.scale);
-            background.subtract(background, opaque);
+            background -= opaque;  // 有窗口内容的地方不用画 background
         }
 
         if (floor(renderData.scale) != renderData.scale) {
             wlr_region_expand(background.raw(), background.raw(), 1);
-            pixman_region32_intersect(background.raw(), background.raw(), &renderData.damage);
+            background.intersectWith(renderData.damage);
         }
     }
 
     transformOutputDamage(background.raw(), &renderData);
 
 
-    // 桌面背景
-    
+    // 渲染桌面背景
+
     auto backgroundRenderRectOptions = (wlr_render_rect_options) {
         .box = {
             .width = buffer->width,
@@ -597,7 +600,8 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
             .g = 0.73725f,
             .b = 0.81961f,
             .a = 1.f
-        }
+        },
+        .clip = background.raw()
     };
     wlr_render_pass_add_rect(renderPass, &backgroundRenderRectOptions);
 
@@ -626,11 +630,9 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
     // software cursor 
 
     if (this->forceRenderSoftwareCursor) {
-        forceRenderSoftwareCursorToRenderPass(wlrOutput, renderPass, &renderData.damage);
+        forceRenderSoftwareCursorToRenderPass(wlrOutput, renderPass, renderData.damage.raw());
     }
 
-
-    pixman_region32_fini(&renderData.damage);
 
     if (!wlr_render_pass_submit(renderPass)) {
         wlr_buffer_unlock(buffer);
@@ -638,11 +640,10 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
         return false;
     }
 
-
     wlr_output_state_set_buffer(state, buffer);
 
     if (exportScreenBuffer) {
-        this->framebufferPlate.put(buffer);
+        this->framebufferPlate.put(buffer, renderData.damage);
     }
 
     wlr_buffer_unlock(buffer);
@@ -675,6 +676,9 @@ Output::~Output() {
 }
 
 
+/* ------------ Output's Frame Buffer Plate ------------ */
+
+
 Output::FramebufferPlate::~FramebufferPlate() {
     buf.lock.acquire();
     recycleBin.lock.acquire();
@@ -695,18 +699,20 @@ void Output::FramebufferPlate::recycle(wlr_buffer* oldBuf) {
 }
 
 
-wlr_buffer* Output::FramebufferPlate::get() {
+wlr_buffer* Output::FramebufferPlate::get(pixman::Region32& damage) {
     buf.lock.acquire();
     auto* ret = buf.buf;
     if (ret) {
         wlr_buffer_lock(ret);
+        damage = buf.damage;
+        buf.damage.clear();
     }
     buf.lock.release();
     return ret;
 }
 
 
-void Output::FramebufferPlate::put(wlr_buffer* newBuf) {
+void Output::FramebufferPlate::put(wlr_buffer* newBuf, const pixman::Region32& damage) {
     
     // 先倒垃圾。
     
@@ -724,6 +730,7 @@ void Output::FramebufferPlate::put(wlr_buffer* newBuf) {
     }
     buf.buf = newBuf;
     wlr_buffer_lock(newBuf);
+    buf.damage += damage;
     buf.lock.release();
     
 }

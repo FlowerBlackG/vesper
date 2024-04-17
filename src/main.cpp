@@ -33,6 +33,7 @@
 
 #include "./utils/wlroots-cpp.h"
 #include "./common/MouseButton.h"
+#include "./bindings/pixman.h"
 
 #include <pixman-1/pixman-version.h>
 #include <wayland-version.h>
@@ -43,6 +44,7 @@
 using namespace std;
 using namespace vesper;
 using namespace vesper::common;
+using namespace vesper::bindings;
 
 
 /* ------------ 全局变量 ------------ */
@@ -244,6 +246,57 @@ static int processPureQueryCmds() {
 }
 
 
+static int parseExecCmds(const string& fullCmd, vector<string>& container) {
+    const auto isBlank = [] (int ch) { 
+        return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r';
+    }; // const auto isBlank = [] (int ch)
+
+
+    const auto addCmd = [&isBlank, &container] (string& cmd) {
+        while (cmd.length() && isBlank(cmd.back())) {
+            cmd.pop_back();
+        }
+
+        if (cmd.length()) {
+            container.push_back(cmd);
+        }
+    }; // const auto addCmd = [&isBlank] (string& cmd, vector<string>& container)
+
+
+    string cmd;
+    size_t idx = 0;
+
+    while (idx < fullCmd.length()) {
+        int ch = fullCmd[idx++];
+
+        if (cmd.empty() && isBlank(ch)) {
+            continue;
+        }
+
+        if (ch == '+') {
+            int nextCh = (idx == fullCmd.length()) ? -1 : fullCmd[idx];
+            if (nextCh == ',' || nextCh == '+') {
+                cmd.push_back(nextCh);
+                idx++; // consumes nextCh
+            } else {
+                cmd.push_back(ch); // keep the original ch: '+'
+            }
+        } else if (ch != ',') { // also, ch is not '+'
+            cmd.push_back(ch);
+        } else { // ch is exactly ',', split command.
+            addCmd(cmd);
+            cmd.clear();
+        }
+
+    } // while (idx < fullCmd.length())
+
+    addCmd(cmd);
+
+    return 0;
+
+} // static int parseExecCmds(const string& fullCmd, vector<string>& container)
+
+
 static int buildDesktopOptions() {
     auto& globalOpts = options;
     auto& options = servers.desktop.options;
@@ -280,58 +333,20 @@ static int buildDesktopOptions() {
     options.renderer.pixman = options.backend.headless 
         || args.flags.contains("--use-pixman-renderer");
 
+
     // exec cmds
 
     if (args.values.contains("--exec-cmds")) {
-        try {
-            string execCmds = args.values["--exec-cmds"];
-            size_t pos = execCmds.find(',');
-            if (pos == string::npos) {
-                throw 0;
-            }
-
-            int n = stoi(execCmds.substr(0, pos));
-            execCmds = execCmds.substr(pos + 1);
-            pos = execCmds.find_last_of(',');
-
-            if (pos == string::npos) {
-                throw 0;
-            }
-
-            string packedCmds = execCmds.substr(pos + 1);
-            execCmds = execCmds.substr(0, pos); // 此时 execCmds 是命令长度序列。
-
-            size_t lenSum = 0;
-            
-            while (n--) {
-                pos = execCmds.find(',');
-                size_t len;
-                if (n == 0) {
-                    len = stoi(execCmds);
-                } else if (pos == string::npos) {
-                    throw 0;
-                } else {
-                    len = stoi(execCmds.substr(0, pos));
-                    execCmds = execCmds.substr(pos + 1);
-                }
-
-                if (lenSum + len > packedCmds.length()) {
-                    throw 0;
-                }
-
-                options.launch.apps.push_back(packedCmds.substr(lenSum, len));
-                lenSum += len;
-            }
-
-        } catch(...) {
-            LOG_ERROR("failed to parse --exec-cmds");
+        if (parseExecCmds(args.values["--exec-cmds"], options.launch.apps)) {
+            LOG_ERROR("failed to parse --exec-cmds !");
             return -1;
-        }   
+        }
     } // if (args.values.contains("--exec-cmds"))
 
-    options.output.alwaysRenderEntireScreen = true;
+    options.output.alwaysRenderEntireScreen = false;  // todo
+
     options.output.exportScreenBuffer = globalOpts.enableVnc;
-    options.output.forceRenderSoftwareCursor = globalOpts.enableVnc;
+    options.output.forceRenderSoftwareCursor = globalOpts.enableVnc && false;  // todo
 
     return 0;
 
@@ -369,8 +384,8 @@ static int buildVncOptions() {
         options.auth.libvncserverPasswdFile += args.values[libvncserverPasswdFile];
     }
     
-    options.screenBuffer.getBuffer = [] () {
-        void* buf = servers.desktop.getFramebuffer(0);
+    options.screenBuffer.getBuffer = [] (pixman::Region32& damage) {
+        void* buf = servers.desktop.getFramebuffer(0, damage);
         return buf;
     };
 

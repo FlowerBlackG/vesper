@@ -47,7 +47,22 @@ run: build
 	cd target && ./vesper \
 		--add-virtual-display 720*720 \
 		--use-pixman-renderer \
-		--exec-cmds "2,7,7,konsoledolphin" \
+		--exec-cmds "konsole, dolphin" \
+		--enable-vnc \
+		--vnc-auth-passwd 123456 \
+		--vnc-port 5900 \
+		--libvncserver-passwd-file vesper-vnc-passwd \
+		--enable-ctrl \
+		--ctrl-domain-socket vesper.sock
+
+
+.PHONY: run-headless
+run-headless: build
+	cd target && ./vesper \
+		--headless \
+		--add-virtual-display 1440*900 \
+		--use-pixman-renderer \
+		--exec-cmds "konsole, dolphin" \
 		--enable-vnc \
 		--vnc-auth-passwd 123456 \
 		--vnc-port 5900 \

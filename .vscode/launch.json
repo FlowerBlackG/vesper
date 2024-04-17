@@ -13,7 +13,7 @@
                 "--headless",
                 "--add-virtual-display", "720*720",
                 "--use-pixman-renderer",
-                "--exec-cmds", "2,7,7,konsoledolphin",
+                "--exec-cmds", "konsole, dolphin",
                 "--enable-vnc",
                 "--vnc-auth-passwd", "123456",
                 "--vnc-port", "5900",
@@ -42,7 +42,7 @@
             "program": "${workspaceFolder}/target/vesper",
             "args": [
                 "--use-pixman-renderer",
-                "--exec-cmds", "2,7,7,konsoledolphin",
+                "--exec-cmds", "konsole, dolphin",
                 "--enable-vnc",
                 "--vnc-auth-passwd", "123456",
                 "--vnc-port", "5900",

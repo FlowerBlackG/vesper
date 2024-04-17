@@ -11,6 +11,7 @@
 #include "../../utils/wlroots-cpp.h"
 #include "../../utils/ObjUtils.h"
 #include "../../common/MouseButton.h"
+#include "../../bindings/pixman.h"
 #include "./Output.h"
 
 #include <unistd.h>
@@ -121,7 +122,7 @@ public:
     void terminate();
 
     std::map<void*, wlr_buffer*> framebufferRentMap;
-    void* getFramebuffer(int displayIndex);
+    void* getFramebuffer(int displayIndex, vesper::bindings::pixman::Region32& damage);
     void recycleFramebuffer(void* oldFrameData, int displayIndex);
 
     /* ------ 运行过程中发送更新信息 ------ */

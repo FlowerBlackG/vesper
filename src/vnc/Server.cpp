@@ -12,6 +12,7 @@
 using namespace std;
 
 using namespace vesper::common;
+using namespace vesper::bindings;
 
 namespace vesper::vnc {
     
@@ -20,12 +21,24 @@ Server::~Server() {
     this->clear();
 }
 
+
+static void markDamagedAreas(rfbScreenInfoPtr screen, const pixman::Region32& damage) {
+    int nRects;
+    const pixman_box32_t* rects = damage.rectangles(&nRects);
+    for (int i = 0; i < nRects; i++) {
+        auto& it = rects[i];
+        rfbMarkRectAsModified(screen, it.x1, it.y1, it.x2, it.y2);
+    }
+}
+
+
 static void clearRunOptionsResult(Server::RunOptions& options) {
     auto& res = options.result;
 
     res.msg.clear();
     res.serverLaunchedSignal.try_acquire();
 }
+
 
 int Server::run() {
 
@@ -52,6 +65,7 @@ int Server::run() {
         this->clear();
         return opts.result.code;
     }
+    memset(framebufferFallback, 0, framebufSize);
 
     rfbServer->frameBuffer = nullptr;
     
@@ -113,7 +127,7 @@ int Server::run() {
         }
 
         if (options.screenBuffer.getBuffer) {
-            rfbServer->frameBuffer = (char*) options.screenBuffer.getBuffer();
+            rfbServer->frameBuffer = (char*) options.screenBuffer.getBuffer(this->frameDamage);
         } else {
             rfbServer->frameBuffer = nullptr;
         }
@@ -122,8 +136,11 @@ int Server::run() {
             rfbServer->frameBuffer = this->framebufferFallback;
         }
 
-        rfbMarkRectAsModified(rfbServer, 0, 0, options.screenBuffer.width, options.screenBuffer.height);
-        rfbProcessEvents(rfbServer, 50000);
+        if (rfbServer->frameBuffer != framebufferFallback) {
+            markDamagedAreas(rfbServer, frameDamage);
+        }
+
+        rfbProcessEvents(rfbServer, 16000);
     }
 
     // clean up

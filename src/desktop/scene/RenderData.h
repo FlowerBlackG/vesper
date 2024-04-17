@@ -9,6 +9,7 @@
 #pragma once
 
 #include "../../utils/wlroots-cpp.h"
+#include "../../bindings/pixman.h"
 
 namespace vesper::desktop::scene {
 
@@ -23,7 +24,7 @@ struct RenderData {
     Output* output;
 
     wlr_render_pass* wlrRenderPass;
-    pixman_region32_t damage;
+    vesper::bindings::pixman::Region32 damage;
 };
 
 } // namespace vesper::desktop::scene

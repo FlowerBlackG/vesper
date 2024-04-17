@@ -126,9 +126,8 @@ void Scene::updateRegion(pixman::Region32& updateRegion) {
 
 void Scene::updateRegion(pixman_region32_t* updateRegion) {
 
-    pixman::Region32 visible;
-    pixman_region32_copy(visible.raw(), updateRegion);
-
+    pixman::Region32 visible = updateRegion;
+    
     SceneUpdateData data = {
         .visible = visible.raw(),
         .updateRegion = updateRegion,
