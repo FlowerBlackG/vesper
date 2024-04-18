@@ -26,7 +26,8 @@ static void xdgToplevelMapEventBridge(wl_listener* listener, void* data) {
    
     wl_list_insert(&view->server->views, &view->link);
 
-    LOG_INFO("new xdg toplevel mapped.");
+    auto appTitle = view->wlrXdgToplevel->title;
+    LOG_INFO("new xdg toplevel \"", (appTitle ? appTitle : "no title"), "\" mapped.");
 
     view->focus(view->wlrXdgToplevel->base->surface);
 }
@@ -102,22 +103,42 @@ static void xdgToplevelRequestResizeEventBridge(wl_listener* listener, void* dat
 static void xdgToplevelrequestMaximizeEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.requestMaximize);
     
-    if (view->wlrXdgToplevel->base->initialized) {
+    view->xdgToplevelrequestMaximizeEventHandler();
+}
+
+
+void View::xdgToplevelrequestMaximizeEventHandler() {
+
+    if (this->wlrXdgToplevel->base->initialized) {
         
         // todo: 假设仅有 1 个 output
 
-        auto outputNode = view->server->outputs.next;
-        Output* output = wl_container_of(outputNode, output, link);
+        if (!this->maximized()) {
+            auto outputNode = this->server->outputs.next;
+            Output* output = wl_container_of(outputNode, output, link);
 
-        int targetHeight = output->wlrOutput->height;
-        int targetWidth = output->wlrOutput->width;
+            int targetHeight = output->wlrOutput->height;
+            int targetWidth = output->wlrOutput->width;
 
-        view->sceneTree->setPosition(0, 0);
-        wlr_xdg_toplevel_set_size(view->wlrXdgToplevel, targetWidth, targetHeight);
+            this->sizeBeforeMaximization = {
+                .width = this->wlrXdgToplevel->base->current.geometry.width,
+                .height = this->wlrXdgToplevel->base->current.geometry.height,
+                .x = this->sceneTree->offset.x,
+                .y = this->sceneTree->offset.y
+            };
 
-        // todo
+            this->sceneTree->setPosition(0, 0);
+
+            wlr_xdg_toplevel_set_maximized(wlrXdgToplevel, true);
+            wlr_xdg_toplevel_set_size(wlrXdgToplevel, targetWidth, targetHeight);            
+        } else {
+            tryUnmaximize();
+        }
+
+
     }
 }
+
 
 static void xdgToplevelRequestFullscreenEventBridge(wl_listener* listener, void* data) {
 
@@ -251,4 +272,50 @@ void View::beginInteraction(Cursor::Mode cursorMode, uint32_t edges) { // todo :
     
 }
 
+
+bool View::tryUnmaximize(
+    int cursorPosX, 
+    int cursorPosY,
+    int* viewPosX, 
+    int* viewPosY
+) {
+    if (!this->maximized()) {
+        return false;
+    }
+
+    int targetWidth = this->sizeBeforeMaximization.width;
+    int targetHeight = this->sizeBeforeMaximization.height;
+
+    int targetX;
+    int targetY;
+
+    if (cursorPosX == -1 || cursorPosY == -1) {
+        targetX = sizeBeforeMaximization.x;
+        targetY = sizeBeforeMaximization.y;
+    } else {
+        // todo: 假设只有1个 output
+
+        auto outputNode = this->server->outputs.next;
+        Output* output = wl_container_of(outputNode, output, link);
+
+        targetY = cursorPosY;
+        targetX = int(cursorPosX - (1.0 * cursorPosX / output->wlrOutput->width) * targetWidth);
+    }
+
+    this->sceneTree->setPosition(targetX, targetY);
+    
+    if (viewPosX) {
+        *viewPosX = targetX;
+    }
+
+    if (viewPosY) {
+        *viewPosY = targetY;
+    }
+
+    wlr_xdg_toplevel_set_maximized(wlrXdgToplevel, false);
+    wlr_xdg_toplevel_set_size(wlrXdgToplevel, targetWidth, targetHeight);
+    return true;
 }
+
+}
+

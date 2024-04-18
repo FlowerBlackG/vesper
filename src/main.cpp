@@ -215,14 +215,17 @@ static void version(bool useLog) {
             " (", VESPER_VERSION_CODE,")"
         );
 
+        LOG_INFO("vesper-core complication time: ", VESPER_BUILD_TIME_STR);
+
         LOG_INFO("wlroots version: ", WLR_VERSION_STR);
         LOG_INFO("pixman version : ", PIXMAN_VERSION_STRING);
         LOG_INFO("wayland version: ", WAYLAND_VERSION);
 
     } else {
         
-        cout << "vesper core " << VESPER_VERSION_NAME 
-            << " (" << VESPER_VERSION_CODE << ")" << endl;
+        cout << "vesper-core " << VESPER_VERSION_NAME 
+            << " (" << VESPER_VERSION_CODE << ")" << endl
+            << "" << VESPER_BUILD_TIME_STR << endl;
         cout << "------------" << endl;
         cout << "wlroots: " << WLR_VERSION_STR << endl;
         cout << "pixman : " << PIXMAN_VERSION_STRING << endl;

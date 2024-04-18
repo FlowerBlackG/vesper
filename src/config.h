@@ -20,4 +20,6 @@
 #define VESPER_VERSION_PATCH 1
 #define VESPER_VERSION_CODE 1
 
+#define VESPER_BUILD_TIME_STR __DATE__ " " __TIME__
+
 #endif

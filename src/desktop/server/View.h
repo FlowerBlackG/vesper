@@ -39,6 +39,19 @@ public:
 
     void focus(wlr_surface* surface);
     void beginInteraction(Cursor::Mode cursorMode, uint32_t edges);
+    bool tryUnmaximize(
+        int cursorPosX = -1, 
+        int cursorPosY = -1, 
+        int* viewPosX = nullptr, 
+        int* viewPosY = nullptr
+    );
+
+    void xdgToplevelrequestMaximizeEventHandler();
+
+
+    inline bool maximized() {
+        return this->wlrXdgToplevel->current.maximized;
+    }
 
 protected:
     View() {}
@@ -64,6 +77,14 @@ public:
         wl_listener requestFullscreen;
 
     } eventListeners;
+
+protected:
+    struct {
+        int width;
+        int height;
+        int x;
+        int y;
+    } sizeBeforeMaximization = {0};
 
 
 };

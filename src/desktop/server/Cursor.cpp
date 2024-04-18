@@ -156,7 +156,13 @@ void Cursor::processMotion(uint32_t timeMsec) {
 
 
 void Cursor::processMove(uint32_t timeMsec) {
-    grabbedView->sceneTree->setPosition(wlrCursor->x - grabX, wlrCursor->y - grabY);
+    int viewPosX, viewPosY;
+    if (grabbedView->tryUnmaximize(wlrCursor->x, wlrCursor->y, &viewPosX, &viewPosY)) {
+        grabX = wlrCursor->x - viewPosX;
+        grabY = wlrCursor->y - viewPosY;
+    } else {
+        grabbedView->sceneTree->setPosition(wlrCursor->x - grabX, wlrCursor->y - grabY);
+    }
 }
 
 
