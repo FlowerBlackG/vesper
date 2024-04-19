@@ -11,24 +11,53 @@ help:
 	@echo "commands available:"
 	@echo "- make run"
 	@echo "    build and launch vesper"
-	@echo "- make build"
-	@echo "    build vesper and copy the binary to \"target\" folder"
+	@echo "- make debug"
+	@echo "    build vesper (with debug) and copy the binary to \"target\" folder"
+	@echo "- make release"
+	@echo "    build vesper (without debug) and copy the binary to \"target\" folder"
 	@echo "- make"
 	@echo "    alias for \"make all\""
+	@echo "- (sudo) make install"
+	@echo "    build vesper and copy binary to /usr/sbin"
+	@echo "- (sudo) make uninstall"
+	@echo "    uninstall vesper from system"
 
-.PHONY: prepare
-prepare:
+.PHONY: prepare-debug
+prepare-debug:
 	mkdir -p build && cd build \
-	&& cmake -G"Unix Makefiles" ../src
+	&& cmake -DCMAKE_BUILD_TYPE=Debug -G"Unix Makefiles" ../src
 
 
-.PHONY: build
-build: prepare
+.PHONY: prepare-release
+prepare-release:
+	mkdir -p build && cd build \
+	&& cmake -DCMAKE_BUILD_TYPE=Release -G"Unix Makefiles" ../src
+
+
+# private target: --build
+.PHONY: --build
+--build:
 	cd build && cmake --build . -- -j 8
 	mkdir -p target && cp build/vesper target/
 	cd target && mkdir -p asm-dump \
 	&& objdump -d ./vesper > asm-dump/vesper.text.asm
 	@echo -e "\033[32mbuild success (vesper).\033[0m"
+
+
+.PHONY: build-debug
+build-debug: prepare-debug --build
+
+
+.PHONY: debug
+debug: build-debug
+
+
+.PHONY: build-release
+build-release: prepare-release --build
+
+
+.PHONY: release
+release: build-release
 
 
 .PHONY: clean
@@ -38,12 +67,26 @@ clean:
 
 
 .PHONY: run-no-args
-run-no-args: build
+run-no-args: debug
 	cd target && ./vesper
 
 
 .PHONY: run
-run: build
+run: debug
+	cd target && ./vesper \
+		--add-virtual-display 720*720 \
+		--use-pixman-renderer \
+		--exec-cmds "konsole, dolphin" \
+		--enable-vnc \
+		--vnc-auth-passwd 123456 \
+		--vnc-port 5900 \
+		--libvncserver-passwd-file vesper-vnc-passwd \
+		--enable-ctrl \
+		--ctrl-domain-socket vesper.sock
+
+
+.PHONY: run-release
+run-release: release
 	cd target && ./vesper \
 		--add-virtual-display 720*720 \
 		--use-pixman-renderer \
@@ -57,7 +100,7 @@ run: build
 
 
 .PHONY: run-headless
-run-headless: build
+run-headless: debug
 	cd target && ./vesper \
 		--headless \
 		--add-virtual-display 1440*900 \
@@ -72,7 +115,7 @@ run-headless: build
 
 
 .PHONY: install
-install: build
+install: release
 	cp target/vesper /usr/sbin/vesper
 
 
@@ -82,4 +125,4 @@ uninstall:
 
 
 .PHONY: all
-all: build
+all: debug

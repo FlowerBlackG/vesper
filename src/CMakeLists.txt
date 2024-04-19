@@ -3,7 +3,7 @@
     创建于 2023年12月26日 上海市嘉定区安亭镇
 ]]
 
-cmake_minimum_required(VERSION 3.24.1)
+cmake_minimum_required(VERSION 3.29.2)
 
 
 #[[
@@ -12,7 +12,7 @@ cmake_minimum_required(VERSION 3.24.1)
 set(VESPER_VERSION_MAJOR 0)
 set(VESPER_VERSION_MINOR 0)
 set(VESPER_VERSION_PATCH 1)
-set(VESPER_VERSION_TAIL "") # 例："-dev"
+set(VESPER_VERSION_TAIL "-dev") # 例："-dev"
 
 set(VESPER_VERSION_CODE 1)
 
@@ -43,7 +43,6 @@ include_directories(${PROJECT_SOURCE_DIR})
 ]]
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 
 #[[ 
     项目构造产物

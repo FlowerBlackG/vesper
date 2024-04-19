@@ -14,7 +14,7 @@
 #define __CMAKE_VESPER_CONFIG_IN__
 
 // vesper 版本号
-#define VESPER_VERSION_NAME "0.0.1"
+#define VESPER_VERSION_NAME "0.0.1-dev"
 #define VESPER_VERSION_MAJOR 0
 #define VESPER_VERSION_MINOR 0
 #define VESPER_VERSION_PATCH 1

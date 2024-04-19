@@ -593,8 +593,8 @@ int main(int argc, const char* argv[], const char* env[]) {
 
     processEnvVars(env);
 
-    if (int res = processPureQueryCmds()) {
-        return res;
+    if (processPureQueryCmds()) {
+        return 0;
     }
 
     if (int res = buildOptions()) { 
