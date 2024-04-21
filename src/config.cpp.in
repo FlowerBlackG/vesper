@@ -1,0 +1,27 @@
+// SPDX-License-Identifier: MulanPSL-2.0
+
+/*
+ * cmake config file
+ * 创建于 2023年12月26日 上海市嘉定区安亭镇
+ * 
+ * 不要直接修改 config.cpp 那个文件。
+ * config.cpp.in 修改后，运行 make 命令，会自动更新 config.h
+ */
+
+
+#include "./config.h"
+using namespace std;
+
+// vesper 版本号
+const string VESPER_VERSION_NAME = "@VESPER_VERSION_NAME@";
+const int64_t VESPER_VERSION_MAJOR = @VESPER_VERSION_MAJOR@;
+const int64_t VESPER_VERSION_MINOR = @VESPER_VERSION_MINOR@;
+const int64_t VESPER_VERSION_PATCH = @VESPER_VERSION_PATCH@;
+const int64_t VESPER_VERSION_CODE = @VESPER_VERSION_CODE@;
+
+/** example: 2024-04-21T06:00:52Z */
+const string VESPER_BUILD_TIME_ISO8601 = "@VESPER_BUILD_TIME_ISO8601@";
+
+/** example: April 21, 2024 14:00:52 CST */
+const string VESPER_BUILD_TIME_HUMAN_READABLE = "@VESPER_BUILD_TIME_HUMAN_READABLE@";
+

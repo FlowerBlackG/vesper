@@ -215,7 +215,7 @@ static void version(bool useLog) {
             " (", VESPER_VERSION_CODE,")"
         );
 
-        LOG_INFO("vesper-core complication time: ", VESPER_BUILD_TIME_STR);
+        LOG_INFO("vesper-core complication time: ", VESPER_BUILD_TIME_HUMAN_READABLE);
 
         LOG_INFO("wlroots version: ", WLR_VERSION_STR);
         LOG_INFO("pixman version : ", PIXMAN_VERSION_STRING);
@@ -225,7 +225,7 @@ static void version(bool useLog) {
         
         cout << "vesper-core " << VESPER_VERSION_NAME 
             << " (" << VESPER_VERSION_CODE << ")" << endl
-            << "" << VESPER_BUILD_TIME_STR << endl;
+            << "" << VESPER_BUILD_TIME_HUMAN_READABLE << endl;
         cout << "------------" << endl;
         cout << "wlroots: " << WLR_VERSION_STR << endl;
         cout << "pixman : " << PIXMAN_VERSION_STRING << endl;
@@ -346,6 +346,10 @@ static int buildDesktopOptions() {
         }
     } // if (args.values.contains("--exec-cmds"))
 
+    if (globalOpts.enableVnc) {
+        options.runtimeCtrl.enabled = true;
+    }
+
     options.output.alwaysRenderEntireScreen = false;  // todo
 
     options.output.exportScreenBuffer = globalOpts.enableVnc;
@@ -400,50 +404,27 @@ static int buildVncOptions() {
         bool absolute, double absoluteX, double absoluteY,
         bool delta, int deltaX, int deltaY
     ) {
-        servers.desktop.moveCursorAsyncArgsMutex.acquire();
-        auto& args = servers.desktop.moveCursorAsyncArgs;
-        args.absolute = absolute;
-        args.absoluteX = absoluteX;
-        args.absoluteY = absoluteY;
-        args.delta = delta;
-        args.deltaX = deltaX;
-        args.deltaY = deltaY;
-        servers.desktop.moveCursorAsync();
-        servers.desktop.moveCursorAsyncArgsMutex.release();
+        servers.desktop.moveCursorAsync(
+            absolute, absoluteX, absoluteY, delta, deltaX, deltaY
+        );
     };
 
     servers.vnc.options.eventHandlers.mouse.button = [] (
         bool press, MouseButton button
     ) {
-        servers.desktop.pressMouseButtonAsyncArgsMutex.acquire();
-        auto& args = servers.desktop.pressMouseButtonAsyncArgs;
-        args.press = press;
-        args.button = button;
-        servers.desktop.pressMouseButtonAsync();
-        servers.desktop.pressMouseButtonAsyncArgsMutex.release();
+        servers.desktop.pressMouseButtonAsync(press, button);
     };
 
     servers.vnc.options.eventHandlers.mouse.axis = [] (
         bool vertical, double delta, int32_t deltaDiscrete
     ) {
-        servers.desktop.scrollAsyncArgsMutex.acquire();
-        auto& args = servers.desktop.scrollAsyncArgs;
-        args.vertical = vertical;
-        args.delta = delta;
-        args.deltaDiscrete = deltaDiscrete;
-        servers.desktop.scrollAsync();
-        servers.desktop.scrollAsyncArgsMutex.release();
+        servers.desktop.scrollAsync(vertical, delta, deltaDiscrete);
     };
 
     servers.vnc.options.eventHandlers.keyboard.key = [] (
         bool pressed, xkb_keysym_t keysym
     ) {
-        servers.desktop.keyboardInputAsyncArgsMutex.acquire();
-        auto& args = servers.desktop.keyboardInputAsyncArgs;
-        args.keysym = keysym;
-        args.pressed = pressed;
-        servers.desktop.keyboardInputAsync();
-        servers.desktop.keyboardInputAsyncArgsMutex.release();
+        servers.desktop.keyboardInputAsync(keysym, pressed);
     };
 
     return 0;

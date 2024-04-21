@@ -182,7 +182,7 @@ int Server::run() {
 
     this->wlDisplay = wl_display_create();
     this->terminated = false;
-    auto wlEventLoop = wl_display_get_event_loop(wlDisplay);
+    this->wlEventLoop = wl_display_get_event_loop(wlDisplay);
     
     // backend
     
@@ -339,8 +339,13 @@ int Server::run() {
     // wayland event loop
 
     options.result.signals.serverLaunched.release();
+    if (options.runtimeCtrl.enabled) {
+        this->runtimeControlEventLoop();  // run async
+    }
 
+    this->wlDisplayRunning = true;
     wl_display_run(wlDisplay); // run blocking.
+    this->wlDisplayRunning = false;
 
     // clean up.
 
@@ -348,6 +353,7 @@ int Server::run() {
 
     return 0;
 }
+
 
 void Server::terminate() {
     if (terminated) {
@@ -403,6 +409,47 @@ void Server::clear() {
     }
 
 }
+
+
+void Server::runtimeControlEventLoop() {
+    if (this->terminated) {
+        return;
+    }
+
+    // do things
+
+    if (this->wlDisplayRunning) {
+        runtimeControlCmds.lock.acquire();
+
+        while (!runtimeControlCmds.waitingQueue.empty()) {
+            auto& it = runtimeControlCmds.waitingQueue.front();
+            it.f(this, it.data);  // invokes
+            if (it.data) {
+                delete it.data;
+            }
+            runtimeControlCmds.waitingQueue.pop();
+        }
+
+        runtimeControlCmds.lock.release();
+    } // if (this->wlDisplayRunning)
+
+
+    // register next loop
+
+    if (!this->terminated) {
+        wl_event_source* event = wl_event_loop_add_timer(
+            this->wlEventLoop,
+            [] (void* data) { 
+                ((Server*) data)->runtimeControlEventLoop();
+                return 0;
+            },
+            this
+        );
+
+        wl_event_source_timer_update(event, options.runtimeCtrl.checkIntervalMs);
+    }
+}
+
 
 void* Server::getFramebuffer(int displayIndex, pixman::Region32& damage) {
 
@@ -547,221 +594,281 @@ static inline int64_t currTimeMsec() {
 }
 
 
-#define IMPL_SERVER_ASYNC_COMMAND_BRIDGE(command) \
-    int Server::command ## Async() { \
-        wl_event_source* event = wl_event_loop_add_timer( \
-            wl_display_get_event_loop(wlDisplay), \
-            command ## AsyncCommandHandler, \
-            &command ## AsyncArgs \
-        ); \
-        \
-        return wl_event_source_timer_update(event, 1); \
+#define ADD_CMD_TO_QUEUE(callable) \
+    runtimeControlCmds.lock.acquire(); \
+    runtimeControlCmds.waitingQueue.emplace((RuntimeControlCmd) { \
+        .f = callable, \
+        .data = args \
+    }); \
+    runtimeControlCmds.lock.release(); 
+
+
+int Server::setResolutionAsync(int index, int width, int height, int refreshRate) {
+    if (!options.runtimeCtrl.enabled) {
+        return -1;
     }
 
-
-#define DECL_SERVER_ASYNC_COMMAND_HANDLER(command) \
-    static int command ## AsyncCommandHandler(void* data) \
-
-#define GET_SERVER(command) \
-    Server* server = wl_container_of(data, server, command ## AsyncArgs);
-
-#define GET_SERVER_AND_ARGS(command) \
-    GET_SERVER(command) \
-    auto& args = server->command ## AsyncArgs;
-
-
-
-DECL_SERVER_ASYNC_COMMAND_HANDLER(setResolution) {
-    GET_SERVER_AND_ARGS(setResolution)
-
-    server->setResolutionAsyncArgsMutex.acquire();
-
-    int currIdx = 0;
-    
-    Output* output;
-    wl_list_for_each(output, &server->outputs, link) {
-        if (args.index == currIdx++) {
-            wlr_output_state state;
-            wlr_output_state_init(&state);
-            wlr_output_state_set_custom_mode(&state, args.width, args.height, args.refreshRate);
-            
-            if (wlr_output_commit_state(output->wlrOutput, &state)) {
-                // success
-            }
-
-            break;
-        }
-    }
-    
-    server->setResolutionAsyncArgsMutex.release();
-
-    return 0;
-}
-
-IMPL_SERVER_ASYNC_COMMAND_BRIDGE(setResolution)
-
-
-DECL_SERVER_ASYNC_COMMAND_HANDLER(moveCursor) {
-    GET_SERVER_AND_ARGS(moveCursor)
-    auto& cursor = server->cursor;
-    
-    server->moveCursorAsyncArgsMutex.acquire();
-
-    auto currTime = currTimeMsec();
-
-
-    wlr_cursor_warp_absolute(cursor->wlrCursor, nullptr, args.absoluteX, args.absoluteY);
-    wlr_cursor_move(cursor->wlrCursor, nullptr, args.deltaX, args.deltaY);
-    
-    cursor->processMotion(currTime);
-
-    wlr_seat_pointer_notify_frame(server->wlrSeat);
-
-    Output* output = wl_container_of(server->outputs.next, output, link);
-
-    server->moveCursorAsyncArgsMutex.release();
-
-    return 0;
-}
-
-IMPL_SERVER_ASYNC_COMMAND_BRIDGE(moveCursor)
-
-
-DECL_SERVER_ASYNC_COMMAND_HANDLER(pressMouseButton) {
-    GET_SERVER_AND_ARGS(pressMouseButton)
-
-    uint32_t button = 0;
-    server->pressMouseButtonAsyncArgsMutex.acquire();
-
-    if (args.button == MouseButton::LEFT) {
-        button = BTN_LEFT;
-    } else if (args.button == MouseButton::MIDDLE) {
-        button = BTN_MIDDLE;
-    } else if (args.button == MouseButton::RIGHT) {
-        button = BTN_RIGHT;
+    auto* args = new (nothrow) SetResolutionAsyncArgs;
+    if (!args) {
+        LOG_ERROR("failed to alloc command for SetResolutionAsyncArgs!")
+        return -1;
     }
 
+    args->index = index;
+    args->width = width;
+    args->height = height;
+    args->refreshRate = refreshRate;
 
-    if (button) {
-        server->cursor->buttonEventHandler(
-            currTimeMsec(), 
-            button, 
-            args.press ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED
-        );
-        wlr_seat_pointer_notify_frame(server->wlrSeat);
-    }
+    ADD_CMD_TO_QUEUE(
+        [] (Server* server, void* untypedData) {
+            auto data = (SetResolutionAsyncArgs*) untypedData;
+
+            int currIdx = 0;
     
-    server->pressMouseButtonAsyncArgsMutex.release();
+            Output* output;
+            wl_list_for_each(output, &server->outputs, link) {
+                if (data->index == currIdx++) {
+                    wlr_output_state state;
+                    wlr_output_state_init(&state);
+                    wlr_output_state_set_custom_mode(&state, data->width, data->height, data->refreshRate);
+                    
+                    if (wlr_output_commit_state(output->wlrOutput, &state)) {
+                        // success
+                    }
 
-    return 0;
-}
-
-
-IMPL_SERVER_ASYNC_COMMAND_BRIDGE(pressMouseButton)
-
-
-DECL_SERVER_ASYNC_COMMAND_HANDLER(scroll) {
-    GET_SERVER_AND_ARGS(scroll)
-    server->scrollAsyncArgsMutex.acquire();
-
-    wlr_seat_pointer_notify_axis(
-        server->wlrSeat, currTimeMsec(), 
-        args.vertical ? WL_POINTER_AXIS_VERTICAL_SCROLL : WL_POINTER_AXIS_HORIZONTAL_SCROLL,
-        args.delta, args.deltaDiscrete, WL_POINTER_AXIS_SOURCE_WHEEL,
-        WL_POINTER_AXIS_RELATIVE_DIRECTION_IDENTICAL
-    );
-
-    server->scrollAsyncArgsMutex.release();
-
-    wlr_seat_pointer_notify_frame(server->wlrSeat);
-
-    return 0;
-}
-
-IMPL_SERVER_ASYNC_COMMAND_BRIDGE(scroll)
-
-
-DECL_SERVER_ASYNC_COMMAND_HANDLER(keyboardInput) {
-    GET_SERVER_AND_ARGS(keyboardInput)
-
-    server->keyboardInputAsyncArgsMutex.acquire();
-
-    auto scancode = xKeysymToEvdevScancode(args.keysym);
-    wl_keyboard_key_state pressState = WL_KEYBOARD_KEY_STATE_RELEASED;
-    if (args.pressed) {
-        pressState = WL_KEYBOARD_KEY_STATE_PRESSED;
-    }
-
-    if (scancode) {
-        wlr_keyboard_key_event event {
-            .time_msec = uint32_t(currTimeMsec()),
-            .keycode = scancode,
-            .update_state = false,
-            .state = pressState,
-        };
-
-        // 只考虑第一个键盘。
-        Keyboard* keyboard = wl_container_of(server->keyboards.next, keyboard, link);
-        auto& wlrKeyboard = keyboard->wlrKeyboard;
-
-        wlr_keyboard_notify_key(wlrKeyboard, &event);
-        
-        // modifiers
-        
-        xkb_mod_mask_t depressed = xkb_state_serialize_mods(
-            wlrKeyboard->xkb_state, XKB_STATE_MODS_DEPRESSED
-        );
-        xkb_mod_mask_t latched = xkb_state_serialize_mods(
-            wlrKeyboard->xkb_state, XKB_STATE_MODS_LATCHED
-        );
-        xkb_mod_mask_t locked = xkb_state_serialize_mods(
-            wlrKeyboard->xkb_state, XKB_STATE_MODS_LOCKED
-        );
-
-        bool isLock = false;
-        xkb_mod_index_t keyModIdx;
-
-        if (scancodeToXkbModIndex(scancode, wlrKeyboard->keymap, &keyModIdx, &isLock)) {
-
-            xkb_mod_mask_t mask = 1 << keyModIdx;
-
-            if (args.pressed) {
-                depressed |= mask;
-                if (isLock) {
-                    locked ^= mask;
+                    break;
                 }
-            } else {
-                depressed &= ~mask;
             }
-
-            wlr_keyboard_notify_modifiers(
-                wlrKeyboard, depressed, latched, locked, 
-                wlrKeyboard->modifiers.group
-            );
         }
+    )
+
+    return 0;
+}
+
+
+int Server::moveCursorAsync(
+    bool absoulute, double absoluteX, double absoluteY, 
+    bool delta, int deltaX, int deltaY
+) { 
+    if (!options.runtimeCtrl.enabled) {
+        return -1;
     }
 
+    auto* args = new (nothrow) MoveCursorAsyncArgs;
+    if (!args) {
+        LOG_ERROR("failed to alloc command for MoveCursorAsyncArgs!")
+        return -1;
+    }
+    args->absolute = absoulute;
+    args->absoluteX = absoluteX;
+    args->absoluteY = absoluteY;
+    args->delta = delta;
+    args->deltaX = deltaX;
+    args->deltaY = deltaY;
 
-    server->keyboardInputAsyncArgsMutex.release();
+
+    ADD_CMD_TO_QUEUE(
+        [] (Server* server, void* untypedData) {
+            auto& cursor = server->cursor;
+            auto* data = (MoveCursorAsyncArgs*) untypedData;
+            auto& args = *data;
+
+            auto currTime = currTimeMsec();
+
+            wlr_cursor_warp_absolute(cursor->wlrCursor, nullptr, args.absoluteX, args.absoluteY);
+            wlr_cursor_move(cursor->wlrCursor, nullptr, args.deltaX, args.deltaY);
+            
+            cursor->processMotion(currTime);
+
+            wlr_seat_pointer_notify_frame(server->wlrSeat);
+
+            Output* output = wl_container_of(server->outputs.next, output, link);
+        }
+    )
 
     return 0;
 }
 
-IMPL_SERVER_ASYNC_COMMAND_BRIDGE(keyboardInput)
 
-DECL_SERVER_ASYNC_COMMAND_HANDLER(terminate) {
-    GET_SERVER(terminate)
-    server->terminate();
+
+int Server::pressMouseButtonAsync(bool press, vesper::common::MouseButton button) {
+    
+    if (!options.runtimeCtrl.enabled) {
+        return -1;
+    }
+
+    auto* args = new (nothrow) PressMouseButtonAsyncArgs;
+    if (!args) {
+        LOG_ERROR("failed to alloc command for MoveCursorAsyncArgs!")
+        return -1;
+    }
+    args->press = press;
+    args->button = button;
+
+    ADD_CMD_TO_QUEUE(
+        [] (Server* server, void* untypedData) {
+            auto& args = * (PressMouseButtonAsyncArgs*) untypedData;
+
+            uint32_t button = 0;
+
+            if (args.button == MouseButton::LEFT) {
+                button = BTN_LEFT;
+            } else if (args.button == MouseButton::MIDDLE) {
+                button = BTN_MIDDLE;
+            } else if (args.button == MouseButton::RIGHT) {
+                button = BTN_RIGHT;
+            }
+
+
+            if (button) {
+                server->cursor->buttonEventHandler(
+                    currTimeMsec(), 
+                    button, 
+                    args.press ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED
+                );
+                wlr_seat_pointer_notify_frame(server->wlrSeat);
+            }
+
+        }
+    )
+
     return 0;
 }
 
-IMPL_SERVER_ASYNC_COMMAND_BRIDGE(terminate)
 
-#undef IMPL_SERVER_ASYNC_COMMAND_BRIDGE
-#undef DECL_SERVER_ASYNC_COMMAND_HANDLER
-#undef GET_SERVER_AND_ARGS
-#undef GET_SERVER
+
+int Server::scrollAsync(bool vertical, double delta, int32_t deltaDiscrete) {
+    if (!options.runtimeCtrl.enabled) {
+        return -1;
+    }
+    auto args = new (nothrow) ScrollAsyncArgs;
+    if (!args) {
+        LOG_ERROR("failed to alloc args for scrollAsync!")
+        return -1;
+    }
+
+    args->vertical = vertical;
+    args->delta = delta;
+    args->deltaDiscrete = deltaDiscrete;
+
+    ADD_CMD_TO_QUEUE(
+        [] (Server* server, void* data) {
+
+            auto& args = * (ScrollAsyncArgs*) data;
+            wlr_seat_pointer_notify_axis(
+                server->wlrSeat, currTimeMsec(), 
+                args.vertical ? WL_POINTER_AXIS_VERTICAL_SCROLL : WL_POINTER_AXIS_HORIZONTAL_SCROLL,
+                args.delta, args.deltaDiscrete, WL_POINTER_AXIS_SOURCE_WHEEL,
+                WL_POINTER_AXIS_RELATIVE_DIRECTION_IDENTICAL
+            );
+
+            wlr_seat_pointer_notify_frame(server->wlrSeat);
+        }
+    )
+
+    return 0;
+}
+
+
+int Server::keyboardInputAsync(xkb_keysym_t keysym, bool pressed) {
+    if (!options.runtimeCtrl.enabled) { 
+        return -1; 
+    }
+    auto args = new (nothrow) KeyboardInputAsyncArgs;
+    if (!args) {
+        LOG_ERROR("failed to alloc args for KeyboardInputAsync!")
+        return -1;
+    }
+
+    args->keysym = keysym;
+    args->pressed = pressed;
+
+    const auto handler = [] (Server* server, void* untypedData) {
+        auto& args = * (KeyboardInputAsyncArgs*) untypedData;
+
+        auto scancode = xKeysymToEvdevScancode(args.keysym);
+        wl_keyboard_key_state pressState = WL_KEYBOARD_KEY_STATE_RELEASED;
+        if (args.pressed) {
+            pressState = WL_KEYBOARD_KEY_STATE_PRESSED;
+        }
+
+        if (scancode) {
+            wlr_keyboard_key_event event {
+                .time_msec = uint32_t(currTimeMsec()),
+                .keycode = scancode,
+                .update_state = false,
+                .state = pressState,
+            };
+
+            // 只考虑第一个键盘。
+            Keyboard* keyboard = wl_container_of(server->keyboards.next, keyboard, link);
+            auto& wlrKeyboard = keyboard->wlrKeyboard;
+
+            wlr_keyboard_notify_key(wlrKeyboard, &event);
+            
+            // modifiers
+            
+            xkb_mod_mask_t depressed = xkb_state_serialize_mods(
+                wlrKeyboard->xkb_state, XKB_STATE_MODS_DEPRESSED
+            );
+            xkb_mod_mask_t latched = xkb_state_serialize_mods(
+                wlrKeyboard->xkb_state, XKB_STATE_MODS_LATCHED
+            );
+            xkb_mod_mask_t locked = xkb_state_serialize_mods(
+                wlrKeyboard->xkb_state, XKB_STATE_MODS_LOCKED
+            );
+
+            bool isLock = false;
+            xkb_mod_index_t keyModIdx;
+
+            if (scancodeToXkbModIndex(scancode, wlrKeyboard->keymap, &keyModIdx, &isLock)) {
+
+                xkb_mod_mask_t mask = 1 << keyModIdx;
+
+                if (args.pressed) {
+                    depressed |= mask;
+                    if (isLock) {
+                        locked ^= mask;
+                    }
+                } else {
+                    depressed &= ~mask;
+                }
+
+                wlr_keyboard_notify_modifiers(
+                    wlrKeyboard, depressed, latched, locked, 
+                    wlrKeyboard->modifiers.group
+                );
+            }
+        } // if (scancode)
+    };
+
+    ADD_CMD_TO_QUEUE(handler);
+
+
+    return 0;
+}
+
+
+int Server::terminateAsync() {
+    if (!options.runtimeCtrl.enabled) {
+        return -1;
+    }
+
+    RuntimeCtrlAsyncArgsBase* args = nullptr;
+    ADD_CMD_TO_QUEUE(
+        [] (Server* server, void*) {
+            server->terminate();
+        }
+    )
+    
+    return 0;
+}
+
+
+#undef ADD_CMD_TO_QUEUE
 
 /* ============ 运行时，外部传入控制信息 结束 ============ */
 
+
 }  // namespace vesper::desktop::server
+

@@ -20,7 +20,8 @@
 #define VESPER_CTRL_EXPAND_RECV_PROTOS(macro) \
     macro(TerminateVesper) \
     macro(GetVNCPort) \
-    macro(GetVNCPassword)
+    macro(GetVNCPassword) \
+    macro(GetVesperVersion)
 
 
 namespace vesper::control::protocol {
@@ -64,7 +65,6 @@ public:
     static const uint32_t typeCode = 0x0001;
     VESPER_CTRL_PROTO_DECL_GET_TYPE()
 
-    virtual int decodeBody(const char* data, int len) override;
 
 protected:
 
@@ -77,7 +77,6 @@ public:
     static const uint32_t typeCode = 0x0101;
     VESPER_CTRL_PROTO_DECL_GET_TYPE()
 
-    virtual int decodeBody(const char* data, int len) override;
 
 protected:
 
@@ -89,9 +88,19 @@ public:
     static const uint32_t typeCode = 0x0102;
     VESPER_CTRL_PROTO_DECL_GET_TYPE()
 
-    virtual int decodeBody(const char* data, int len) override;
 
 protected:
+
+};
+
+
+class GetVesperVersion : public Base {
+public:
+    static const uint32_t typeCode = 0x0201;
+    VESPER_CTRL_PROTO_DECL_GET_TYPE();
+
+protected:
+
 
 };
 

@@ -9,6 +9,7 @@
 #include "./Server.h"
 #include "../log/Log.h"
 #include "./Protocols.h"
+#include "../config.h"
 
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -159,6 +160,13 @@ static int readNBytesFromSocket(int connFd, int n, char* buf) {
 }
 
 
+/**
+ * 
+ * 
+ * @param connFd 
+ * @param code 0 表示正常。
+ * @param msg 
+ */
 static void sendResponse(int connFd, uint32_t code, const string& msg) {
     protocol::Response response;
     response.code = code;
@@ -314,6 +322,17 @@ int Server::processGetVNCPassword(protocol::GetVNCPassword*, int connFd) {
 }
 
 
+int Server::processGetVesperVersion(protocol::GetVesperVersion*, int connFd) {
+    stringstream ss;
+
+    ss << VESPER_VERSION_NAME << ","
+        << VESPER_VERSION_CODE << ","
+        << VESPER_BUILD_TIME_ISO8601;
+
+    sendResponse(connFd, 0, ss.str());
+
+    return 1;
+}
 
 
 } // namespace vesper::control

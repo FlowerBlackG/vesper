@@ -96,3 +96,25 @@ response: msg 为用字符串表示的端口号
 ```
 
 response: msg 为一个字符串
+
+## 0x0201: 获取版本信息
+
+GetVesperVersion
+
+```
+    8 Bytes
++----------------+
+|     header     |
++----------------+
+|     header     |
++----------------+
+
+```
+
+response: 字符串。其组成为：`${version name},${version code},${build time}`
+
+response 例：
+
+```
+0.0.1-dev,1,
+```

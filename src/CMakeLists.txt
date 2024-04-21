@@ -11,10 +11,15 @@ cmake_minimum_required(VERSION 3.29.2)
 ]]
 set(VESPER_VERSION_MAJOR 0)
 set(VESPER_VERSION_MINOR 0)
-set(VESPER_VERSION_PATCH 1)
+set(VESPER_VERSION_PATCH 2)
 set(VESPER_VERSION_TAIL "-dev") # 例："-dev"
 
-set(VESPER_VERSION_CODE 1)
+set(VESPER_VERSION_CODE 2)
+
+string(TIMESTAMP build_time_iso8601 UTC)  # example: 2024-04-19T13:39Z
+string(TIMESTAMP build_time_human_readable "%B %d, %Y %H:%M:%S %Z")
+set(VESPER_BUILD_TIME_ISO8601 ${build_time_iso8601})
+set(VESPER_BUILD_TIME_HUMAN_READABLE ${build_time_human_readable})
 
 set(
     VESPER_VERSION_NAME 
@@ -26,8 +31,8 @@ set(
 ]]
 project(vesper)
 configure_file(
-    ${PROJECT_SOURCE_DIR}/config.h.in 
-    ${PROJECT_SOURCE_DIR}/config.h
+    ${PROJECT_SOURCE_DIR}/config.cpp.in 
+    ${PROJECT_SOURCE_DIR}/config.cpp
 )
 
 # 指定使用 C++20

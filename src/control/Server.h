@@ -73,6 +73,7 @@ protected:
     int processTerminateVesper(protocol::TerminateVesper*, int connFd);
     int processGetVNCPort(protocol::GetVNCPort*, int connFd);
     int processGetVNCPassword(protocol::GetVNCPassword*, int connFd);
+    int processGetVesperVersion(protocol::GetVesperVersion*, int connFd);
 
 protected:
     char* socketDataBuf = nullptr;

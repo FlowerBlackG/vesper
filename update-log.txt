@@ -1,0 +1,11 @@
+version  tag  : 0.0.2-dev
+version  code : 2
+complete time : 2024-04-21T17:11+08:00
+update   log  :
+
+veser control
++ New protocol: GetVesperVersion
+
+vesper desktop
+* Rewrite the logic of runtime control, which fixed some issues relating to concurrency.
+--------------------------------

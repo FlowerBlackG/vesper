@@ -64,6 +64,7 @@ release: build-release
 clean:
 	rm -rf ./build
 	rm -rf ./target
+	rm -f ./src/config.cpp
 
 
 .PHONY: run-no-args

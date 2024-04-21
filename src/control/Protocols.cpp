@@ -51,8 +51,7 @@ void Base::encodeBody(stringstream&) const {
 }
 
 int Base::decodeBody(const char*, int) {
-    LOG_ERROR("protocol::Base::decodeBody called.");
-    return -1;
+    return 0;
 }
 
 #define VESPER_CTRL_PROTO_IMPL_GET_TYPE(className) \
@@ -79,26 +78,10 @@ void Response::encodeBody(stringstream& container) const {
     }
 }
 
+/* ------------ recv protocols ------------ */
 
-VESPER_CTRL_PROTO_IMPL_GET_TYPE(TerminateVesper)
+VESPER_CTRL_EXPAND_RECV_PROTOS(VESPER_CTRL_PROTO_IMPL_GET_TYPE)
 
-int TerminateVesper::decodeBody(const char* data, int len) {
-    return 0;
-}
-
-
-VESPER_CTRL_PROTO_IMPL_GET_TYPE(GetVNCPort)
-
-int GetVNCPort::decodeBody(const char* data, int len) {
-    return 0;
-}
-
-
-VESPER_CTRL_PROTO_IMPL_GET_TYPE(GetVNCPassword)
-
-int GetVNCPassword::decodeBody(const char* data, int len) {
-    return 0;
-}
 
 
 Base* decode(const char* data, uint32_t type, int len) {

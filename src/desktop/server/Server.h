@@ -19,6 +19,8 @@
 #include <vector>
 #include <semaphore>
 #include <map>
+#include <queue>
+#include <functional>
 
 namespace vesper::desktop::scene { class Scene; }
 namespace vesper::desktop::scene { class OutputLayout; }
@@ -93,6 +95,11 @@ public:
             bool forceRenderSoftwareCursor;
         } output = {0};
 
+        struct {
+            bool enabled = false;
+            int checkIntervalMs = 16;
+        } runtimeCtrl;
+
 
         /* ------ Server 向外部返回 ------ */
 
@@ -125,65 +132,84 @@ public:
     void* getFramebuffer(int displayIndex, vesper::bindings::pixman::Region32& damage);
     void recycleFramebuffer(void* oldFrameData, int displayIndex);
 
-    /* ------ 运行过程中发送更新信息 ------ */
+    /* ------ 运行过程中发送控制信息 ------ */
 
-    std::binary_semaphore setResolutionAsyncArgsMutex {1};
+    /**
+     * 一个空的结构。所有 runtime control 数据都应该继承自它。
+     * 这样做是为了避免 GCC Warning。
+     */
+    struct RuntimeCtrlAsyncArgsBase {};
+
+    /**
+     * 运行时指令格式。
+     * data 需要动态申请构造。f 为处理函数。
+     * f 内不需要考虑释放 data 的事情。eventloop 会自动释放非 nullptr 的 data。
+     */
+    struct RuntimeControlCmd {
+        std::function<void (Server*, void* data)> f;
+        RuntimeCtrlAsyncArgsBase* data;
+    };
+
+    /**
+     * 运行时指令等待区。
+     */
     struct {
+        std::binary_semaphore lock {1};
+        std::queue<RuntimeControlCmd> waitingQueue {};
+    } runtimeControlCmds;
+
+
+    struct SetResolutionAsyncArgs : public RuntimeCtrlAsyncArgsBase {
         int index;
         int width;
         int height; 
         int refreshRate;
-    } setResolutionAsyncArgs;
+    };
 
-    int setResolutionAsync();
+    int setResolutionAsync(int index, int width, int height, int refreshRate);
     
-    
-    std::binary_semaphore moveCursorAsyncArgsMutex {1};
-    struct {
+
+    struct MoveCursorAsyncArgs : public RuntimeCtrlAsyncArgsBase {
         bool absolute;
         double absoluteX;
         double absoluteY;
         bool delta;
         int deltaX;
         int deltaY;
-
-    } moveCursorAsyncArgs;
+    };
 
     /**
      * 使用前先设置在结构体内设置好数据。
      */
-    int moveCursorAsync();
+    int moveCursorAsync(
+        bool absoulute, double absoluteX, double absoluteY, 
+        bool delta, int deltaX, int deltaY
+    );
 
 
-    std::binary_semaphore pressMouseButtonAsyncArgsMutex {1};
-    struct {
+    struct PressMouseButtonAsyncArgs : public RuntimeCtrlAsyncArgsBase {
         /** true for press, false for release. */
         bool press;
         vesper::common::MouseButton button;
-    } pressMouseButtonAsyncArgs;
+    };
 
-    int pressMouseButtonAsync();
+    int pressMouseButtonAsync(bool press, vesper::common::MouseButton button);
 
 
-    std::binary_semaphore scrollAsyncArgsMutex {1};
-    struct {
+    struct ScrollAsyncArgs : public RuntimeCtrlAsyncArgsBase {
         bool vertical;
         double delta;
         int32_t deltaDiscrete;
-    } scrollAsyncArgs;
-    int scrollAsync();
+    };
+    int scrollAsync(bool vertical, double delta, int32_t deltaDiscrete);
 
 
-    std::binary_semaphore keyboardInputAsyncArgsMutex {1};
-    struct {
+    struct KeyboardInputAsyncArgs : public RuntimeCtrlAsyncArgsBase {
         xkb_keysym_t keysym;
         bool pressed;
-    } keyboardInputAsyncArgs;
-    int keyboardInputAsync();
+    };
+    int keyboardInputAsync(xkb_keysym_t keysym, bool pressed);
 
-    struct {
-        char nothing; // 不需要参数。摆个东西在这里而已。
-    } terminateAsyncArgs;
     int terminateAsync();
 
     /* ============ 对外方法 结束 ============ */
@@ -192,7 +218,8 @@ public:
 
 public:
 
-    void clear();
+    void clear();    
+    void runtimeControlEventLoop();  // run async
 
 public:
     void newOutputEventHandler(wlr_output* newOutput);
@@ -207,11 +234,12 @@ protected:
     VESPER_OBJ_UTILS_DISABLE_COPY(Server);
 
 
-
 public:
 
     wl_display* wlDisplay = nullptr;
+    wl_event_loop* wlEventLoop = nullptr;
     bool terminated = false;
+    bool wlDisplayRunning = false;
     wlr_backend* wlrBackend = nullptr;
     wlr_renderer* wlrRenderer = nullptr;
     wlr_allocator* wlrAllocator = nullptr;

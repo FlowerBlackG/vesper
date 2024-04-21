@@ -1,2 +1,3 @@
 target
 build
+src/config.cpp
