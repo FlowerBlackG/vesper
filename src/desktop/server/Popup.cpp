@@ -11,6 +11,7 @@
 #include "./Popup.h"
 #include "./Server.h"
 #include "../scene/Scene.h"
+#include "../scene/SceneNode.h"
 #include "../scene/XdgShell.h"
 
 using namespace vesper::desktop;
@@ -20,7 +21,38 @@ namespace vesper::desktop::server {
 
 static void xdgPopupCommitEventBridge(wl_listener* listener, void* data) {
     Popup* popup = wl_container_of(listener, popup, eventListeners.commit);
+
     if (popup->wlrXdgPopup->base->initial_commit) {
+
+        // todo: 假设只有1个 output
+
+        auto outputNode = popup->server->outputs.next;
+        Output* output = wl_container_of(outputNode, output, link);
+        auto& wlrOutput = output->wlrOutput;
+
+        wlr_xdg_popup_configure& conf = popup->wlrXdgPopup->scheduled;
+        auto& geo = conf.geometry;
+
+        int posX, posY;
+        popup->sceneTree->setPosition(geo.x, geo.y);
+        popup->sceneTree->coords(&posX, &posY);
+
+        if (posX + geo.width >= wlrOutput->width && geo.width < wlrOutput->width) {
+            geo.x -= posX + geo.width - wlrOutput->width;
+        
+        } 
+        else if (posX < 0 && geo.width < wlrOutput->width) {
+            geo.x -= posX;  // should noticed that posX is negative :D 
+        }
+
+        
+        if (posY + geo.height >= wlrOutput->height && geo.height < wlrOutput->height) {
+            geo.y -= posY + geo.height - wlrOutput->height;
+        } 
+        else if (posY < 0 && geo.height < wlrOutput->height) {
+            geo.y -= posY;
+        }
+
         wlr_xdg_surface_schedule_configure(popup->wlrXdgPopup->base);
     }
 }
@@ -65,6 +97,7 @@ int Popup::init(const CreateOptions& options) {
     }
 
     wlrXdgPopup->base->data = sceneXdgSurface->tree;
+    this->sceneTree = sceneXdgSurface->tree;
 
     this->eventListeners.commit.notify = xdgPopupCommitEventBridge;
     wl_signal_add(&wlrXdgPopup->base->surface->events.commit, &eventListeners.commit);

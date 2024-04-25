@@ -43,6 +43,7 @@ public:
     Server* server;
     wlr_xdg_popup* wlrXdgPopup;
 
+    vesper::desktop::scene::SceneTreeNode* sceneTree;
 
     struct {
         wl_listener commit;

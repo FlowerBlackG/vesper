@@ -1,3 +1,13 @@
+version  tag  : 0.0.3-dev
+version  code : 3
+complete time : 2024-04-25T16:21+08:00
+update   log  :
+
+vesper desktop:
+* Try to ensure all parts of newly created popups inside display area.
+--------------------------------
+
+
 version  tag  : 0.0.2-dev
 version  code : 2
 complete time : 2024-04-21T17:11+08:00
