@@ -643,13 +643,13 @@ bool Output::buildState(wlr_output_state* state, StateOptions* options) {
     wlr_output_state_set_buffer(state, buffer);
 
     if (exportScreenBuffer) {
-        this->framebufferPlate.put(buffer, renderData.damage);
+        this->framebufferPlate.put(buffer, renderData.damage, true);
+    } else {
+        wlr_buffer_unlock(buffer);
     }
 
-    wlr_buffer_unlock(buffer);
-
     return true;
-}
+}  // bool Output::buildState(wlr_output_state* state, StateOptions* options)
 
 
 void Output::sendFrameDone(timespec* now) {
@@ -680,59 +680,84 @@ Output::~Output() {
 
 
 Output::FramebufferPlate::~FramebufferPlate() {
-    buf.lock.acquire();
-    recycleBin.lock.acquire();
-    
-    if (buf.buf) {
-        wlr_buffer_unlock(buf.buf);
-    }
-
-    for (auto& it : recycleBin.bin) {
-        wlr_buffer_unlock(it);
-    }
+    this->clear();
 }
 
 void Output::FramebufferPlate::recycle(wlr_buffer* oldBuf) {
-    recycleBin.lock.acquire();
+    // called by external threads
+
+    lock.acquire();
     recycleBin.bin.push_back(oldBuf);
-    recycleBin.lock.release();
+    lock.release();
 }
 
 
 wlr_buffer* Output::FramebufferPlate::get(pixman::Region32& damage) {
-    buf.lock.acquire();
+    // called by external threads
+
+    lock.acquire();
     auto* ret = buf.buf;
     if (ret) {
-        wlr_buffer_lock(ret);
+
+        wlr_buffer_lock(ret);  // so we can rent same obj multiple times.
+        // once recycled, it unlocked. when new buf placed, unlocks the second time.
+
+
         damage = buf.damage;
         buf.damage.clear();
     }
-    buf.lock.release();
+    lock.release();
     return ret;
-}
+}  // wlr_buffer* Output::FramebufferPlate::get(pixman::Region32& damage)
 
 
-void Output::FramebufferPlate::put(wlr_buffer* newBuf, const pixman::Region32& damage) {
+void Output::FramebufferPlate::put(
+    wlr_buffer* newBuf, 
+    const pixman::Region32& damage,
+    bool dontLockBuffer
+) {
+    // called by desktop server thread
+
+    // clear the garbage bin first
     
-    // 先倒垃圾。
-    
-    recycleBin.lock.acquire();
+    lock.acquire();
     for (auto& it : recycleBin.bin) {
         wlr_buffer_unlock(it);
     }
     recycleBin.bin.clear();
-    recycleBin.lock.release();
     
     
-    buf.lock.acquire();
+    // place buf on plate
+    
+    wlr_buffer* oldBuf = buf.buf;  // unref it later to prevent blocking other threads for too long
+
+    buf.buf = newBuf;
+    if (!dontLockBuffer) {
+        wlr_buffer_lock(newBuf);
+    }
+    buf.damage += damage;
+    lock.release();
+
+    if (oldBuf) {  // now we can unref it without blocking other threads.
+        wlr_buffer_unlock(oldBuf);
+    }
+}  // void Output::FramebufferPlate::put
+
+
+void Output::FramebufferPlate::clear() {
+    lock.acquire();
+    
     if (buf.buf) {
         wlr_buffer_unlock(buf.buf);
+        buf.buf = nullptr;
     }
-    buf.buf = newBuf;
-    wlr_buffer_lock(newBuf);
-    buf.damage += damage;
-    buf.lock.release();
-    
-}
 
-}
+    for (auto& it : recycleBin.bin) {
+        wlr_buffer_unlock(it);
+    }
+    recycleBin.bin.clear();
+    
+    lock.release();
+}  // void Output::FramebufferPlate::clear()
+
+}  // namespace vesper::desktop::scene 

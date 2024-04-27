@@ -1,3 +1,16 @@
+version  tag  : 0.0.4-dev
+version  code : 4
+complete time : 2024-04-27T15:12+08:00
+update   log  :
+
+misc:
+* Bugfix: Random crashes when using Vesper VNC.
+
+vesper desktop:
+* Change working directory to "~" instead of "/" when running as a daemon process.
+--------------------------------
+
+
 version  tag  : 0.0.3-dev
 version  code : 3
 complete time : 2024-04-25T16:21+08:00

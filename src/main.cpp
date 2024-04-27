@@ -391,9 +391,8 @@ static int buildVncOptions() {
         options.auth.libvncserverPasswdFile += args.values[libvncserverPasswdFile];
     }
     
-    options.screenBuffer.getBuffer = [] (pixman::Region32& damage) {
-        void* buf = servers.desktop.getFramebuffer(0, damage);
-        return buf;
+    options.screenBuffer.getBuffer = [] (pixman::Region32& damage) -> void* {
+        return servers.desktop.getFramebuffer(0, damage);
     };
 
     options.screenBuffer.recycleBuffer = [] (void* buf) {
@@ -533,7 +532,7 @@ static int daemonize() {
     }
 
     // 更改当前工作目录。
-    chdir("/");
+    chdir("~");
 
     umask(0);
     signal(SIGTERM, [] (int arg) {

@@ -62,6 +62,31 @@
             ],
             "miDebuggerPath": "/usr/bin/gdb"
 
+        },
+
+        {
+            "name": "(GDB) Open a core dump (C/C++)",
+            "request": "launch",
+            "type": "cppdbg",
+            "program": "${workspaceFolder}/target/vesper",
+            "coreDumpPath": "${input:coreFile}",
+            "cwd": "${workspaceFolder}/target",
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "pretty-print gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ],
+
+    "inputs": [
+        {
+            "id": "coreFile",
+            "type": "promptString",
+            "description": "Enter core file path"
         }
     ]
 }
