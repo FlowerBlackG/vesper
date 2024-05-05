@@ -157,7 +157,8 @@ static void requestSetCursorEventBridge(wl_listener* listener, void* data) {
 static void requestSetSelectionEventBridge(wl_listener* listener, void* data) {
     Server* server = wl_container_of(listener, server, eventListeners.requestSetSelection);
 
-    // todo
+    auto* event = (wlr_seat_request_set_selection_event*) data;
+    wlr_seat_set_selection(server->wlrSeat, event->source, event->serial);
 }
 
 Server::~Server() {
@@ -323,11 +324,20 @@ int Server::run() {
 
     for (auto& it : options.launch.apps) {
         pid_t pid = fork();
+        
         if (pid == 0) { // new process
+            
             execl("/bin/sh", "/bin/sh", "-c", it.c_str(), nullptr);
             exit(-1);
+
+        } else if (pid > 0) { // parent process who has just created a child.
+
+            this->childProcessList.push_back(pid);
+
         } else if (pid < 0) { // failed 
+
             options.result.failedApps.push_back(it);
+        
         }
     }
 
@@ -376,6 +386,14 @@ void Server::clear() {
         wl_display_destroy_clients(wlDisplay);
     }
 
+
+    // send killing signals to children
+    for (auto& it : this->childProcessList) {
+        kill(it, SIGTERM);
+    }
+    this->childProcessList.clear();
+
+
     if (scene) {
         delete scene;
         scene = nullptr;
@@ -395,6 +413,16 @@ void Server::clear() {
     if (wlrSeat) {
         wlr_seat_destroy(wlrSeat);
         wlrSeat = nullptr;
+    }
+
+    if (wlrAllocator) {
+        wlr_allocator_destroy(wlrAllocator);
+        wlrAllocator = nullptr;
+    }
+
+    if (wlrRenderer) {
+        wlr_renderer_destroy(wlrRenderer);
+        wlrRenderer = nullptr;
     }
 
     if (wlrBackend) {
@@ -452,6 +480,9 @@ void Server::runtimeControlEventLoop() {
 
 
 void* Server::getFramebuffer(int displayIndex, pixman::Region32& damage) {
+    if (this->terminated) {
+        return nullptr;
+    }
 
     if (!wlr_renderer_is_pixman(wlrRenderer)) {
         return nullptr;  // only support pixman's framebuffer.
@@ -549,6 +580,8 @@ void Server::newOutputEventHandler(wlr_output* newOutput) {
         LOG_ERROR("failed to create output!");
         return;
     }
+
+    this->currentOutput = output;  // todo: only 1 output supported.
 
 
     options.result.firstDisplayResolution.width = output->wlrOutput->width;

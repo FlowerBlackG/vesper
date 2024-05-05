@@ -399,12 +399,18 @@ static bool sceneNodeAtOnDiscover(SceneNode* node, int lx, int ly, void* data) {
     double rx = atData->lx - lx;
     double ry = atData->ly - ly;
 
-    if (node->type() == SceneNodeType::BUFFER) {
+    if (node->inputTransparent) {
+    
+        return false;
+    
+    } else if (node->type() == SceneNodeType::BUFFER) {
+    
         auto* buf = (SceneBufferNode*) node;
 
         if (buf->pointAcceptsInput && !buf->pointAcceptsInput(buf, &rx, &ry)) {
             return false;
         }
+    
     }
 
     atData->rx = rx;

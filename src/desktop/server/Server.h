@@ -21,6 +21,7 @@
 #include <map>
 #include <queue>
 #include <functional>
+#include <sys/types.h>
 
 namespace vesper::desktop::scene { class Scene; }
 namespace vesper::desktop::scene { class OutputLayout; }
@@ -29,6 +30,7 @@ namespace vesper::desktop::server {
     
 class View;
 class Cursor;
+class Output;
 
 /**
  * Wayland Server
@@ -233,6 +235,8 @@ public:
 protected:
     VESPER_OBJ_UTILS_DISABLE_COPY(Server);
 
+    std::vector<pid_t> childProcessList;
+
 
 public:
 
@@ -253,6 +257,9 @@ public:
      * 成员类型：scene::server::Output
      */
     wl_list outputs;
+
+    // output on which we can find our cursor.
+    vesper::desktop::server::Output* currentOutput = nullptr;
 
     wl_list views;
     wlr_xdg_shell* wlrXdgShell = nullptr;

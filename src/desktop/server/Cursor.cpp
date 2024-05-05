@@ -157,11 +157,21 @@ void Cursor::processMotion(uint32_t timeMsec) {
 
 void Cursor::processMove(uint32_t timeMsec) {
     int viewPosX, viewPosY;
+
+    // this function is called only when grabbedView is not null.
+
     if (grabbedView->tryUnmaximize(wlrCursor->x, wlrCursor->y, &viewPosX, &viewPosY)) {
         grabX = wlrCursor->x - viewPosX;
         grabY = wlrCursor->y - viewPosY;
     } else {
         grabbedView->sceneTree->setPosition(wlrCursor->x - grabX, wlrCursor->y - grabY);
+    }
+
+    // maximize or split screen hint
+    if (grabbedView->tryMaximizeHint(wlrCursor->x, wlrCursor->y)) {
+        // do nothing.
+    } else if (grabbedView->trySplitHorizontallyHint(wlrCursor->x, wlrCursor->y)) {
+        // do nothing.
     }
 }
 
@@ -225,6 +235,10 @@ void Cursor::buttonEventHandler(
     );
 
     if (state == WL_POINTER_BUTTON_STATE_RELEASED) {
+        if (this->cursorMode != Cursor::Mode::PASSTHROUGH && grabbedView) {
+            grabbedView->maximizeIfEager() || grabbedView->splitScreenIfEager();
+        }
+
         this->cursorMode = Cursor::Mode::PASSTHROUGH;
         this->grabbedView = nullptr;
     } else if (state == WL_POINTER_BUTTON_STATE_PRESSED) {

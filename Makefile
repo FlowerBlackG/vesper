@@ -25,13 +25,13 @@ help:
 .PHONY: prepare-debug
 prepare-debug:
 	mkdir -p build && cd build \
-	&& cmake -DCMAKE_BUILD_TYPE=Debug -G"Unix Makefiles" ../src
+	&& cmake -DCMAKE_BUILD_TYPE=Debug -G"Ninja" ../src
 
 
 .PHONY: prepare-release
 prepare-release:
 	mkdir -p build && cd build \
-	&& cmake -DCMAKE_BUILD_TYPE=Release -G"Unix Makefiles" ../src
+	&& cmake -DCMAKE_BUILD_TYPE=Release -G"Ninja" ../src
 
 
 # private target: --build

@@ -353,7 +353,7 @@ static int buildDesktopOptions() {
     options.output.alwaysRenderEntireScreen = false;  // todo
 
     options.output.exportScreenBuffer = globalOpts.enableVnc;
-    options.output.forceRenderSoftwareCursor = globalOpts.enableVnc && false;  // todo
+    options.output.forceRenderSoftwareCursor = false;  // todo
 
     return 0;
 

@@ -11,8 +11,10 @@
 #include "../../utils/wlroots-cpp.h"
 #include "../../utils/ObjUtils.h"
 #include "./Cursor.h"
+#include <map>
 
 namespace vesper::desktop::scene { class SceneTreeNode; }
+namespace vesper::desktop::scene { class SceneRectNode; }
 
 namespace vesper::desktop::server {
 
@@ -30,12 +32,14 @@ class View {
 
 public:
 
+
     struct CreateOptions {
         Server* server;
         wlr_xdg_toplevel* xdgToplevel;
     };
 
     static View* create(const CreateOptions&);
+    ~View();
 
     void focus(wlr_surface* surface);
     void beginInteraction(Cursor::Mode cursorMode, uint32_t edges);
@@ -46,12 +50,54 @@ public:
         int* viewPosY = nullptr
     );
 
+
+    void maximize();
+
+    /**
+     * if this view is eager to maximize (maximizeHint is not -1), then let it maximize.
+     */
+    bool maximizeIfEager();
+
+    void splitScreen(bool splitLeft);
+    bool splitScreenIfEager();
+
+
+    bool tryMaximizeHint(int cursorPosX, int cursorPosY);
+    bool trySplitHorizontallyHint(int cursorPosX, int cursorPosY);
+
     void xdgToplevelrequestMaximizeEventHandler();
 
 
     inline bool maximized() {
         return this->wlrXdgToplevel->current.maximized;
     }
+
+    /**
+     * 
+     * 
+     * 
+     * @return maskID or -1 for failure.
+     */
+    int addColorMask(
+        int x, 
+        int y, 
+        int width, 
+        int height, 
+        int32_t color,
+        float opacity,
+        bool absoluteToOutput
+    );
+
+    int addColorMask(
+        int x, 
+        int y, 
+        int width, 
+        int height, 
+        const float color[4], 
+        bool absoluteToOutput
+    );
+
+    bool removeColorMask(int id);
 
 protected:
     View() {}
@@ -64,6 +110,14 @@ public:
     wlr_xdg_toplevel* wlrXdgToplevel;
 
     vesper::desktop::scene::SceneTreeNode* sceneTree;
+
+    int colorMaskNextId = 1;
+    std::map<int, vesper::desktop::scene::SceneRectNode*> colorMasks;
+    int maximizeHintMask = -1;
+    int splitLeftHintMask = -1;
+    int splitRightHintMask = -1;
+
+    bool inSplitScreenMode = false;
 
 
     struct {

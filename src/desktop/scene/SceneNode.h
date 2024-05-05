@@ -107,6 +107,9 @@ public:
     wl_list link;
     
     bool enabled = true;
+
+    // whether ignore mouse and touch
+    bool inputTransparent = false;
     
     struct {
         int x = 0;

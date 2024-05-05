@@ -114,23 +114,8 @@ void View::xdgToplevelrequestMaximizeEventHandler() {
         // todo: 假设仅有 1 个 output
 
         if (!this->maximized()) {
-            auto outputNode = this->server->outputs.next;
-            Output* output = wl_container_of(outputNode, output, link);
-
-            int targetHeight = output->wlrOutput->height;
-            int targetWidth = output->wlrOutput->width;
-
-            this->sizeBeforeMaximization = {
-                .width = this->wlrXdgToplevel->base->current.geometry.width,
-                .height = this->wlrXdgToplevel->base->current.geometry.height,
-                .x = this->sceneTree->offset.x,
-                .y = this->sceneTree->offset.y
-            };
-
-            this->sceneTree->setPosition(0, 0);
-
-            wlr_xdg_toplevel_set_maximized(wlrXdgToplevel, true);
-            wlr_xdg_toplevel_set_size(wlrXdgToplevel, targetWidth, targetHeight);            
+            
+            maximize();           
         } else {
             tryUnmaximize();
         }
@@ -204,6 +189,12 @@ int View::init(const CreateOptions& options) {
 
     return 0;
 }
+
+
+View::~View() {
+
+}
+
 
 void View::focus(wlr_surface* surface) {
     auto* seat = this->server->wlrSeat;
@@ -279,7 +270,7 @@ bool View::tryUnmaximize(
     int* viewPosX, 
     int* viewPosY
 ) {
-    if (!this->maximized()) {
+    if (!this->maximized() && !inSplitScreenMode) {
         return false;
     }
 
@@ -314,8 +305,242 @@ bool View::tryUnmaximize(
 
     wlr_xdg_toplevel_set_maximized(wlrXdgToplevel, false);
     wlr_xdg_toplevel_set_size(wlrXdgToplevel, targetWidth, targetHeight);
+
+    inSplitScreenMode = false;
     return true;
 }
+
+
+void View::maximize() {
+    Output* output = server->currentOutput;
+
+    int targetHeight = output->wlrOutput->height;
+    int targetWidth = output->wlrOutput->width;
+
+    if (!inSplitScreenMode) {
+        this->sizeBeforeMaximization = {
+            .width = this->wlrXdgToplevel->base->current.geometry.width,
+            .height = this->wlrXdgToplevel->base->current.geometry.height,
+            .x = this->sceneTree->offset.x,
+            .y = this->sceneTree->offset.y
+        };
+    }
+    inSplitScreenMode = false;
+
+    if (splitLeftHintMask != -1 || splitRightHintMask != -1 || maximizeHintMask != -1) {
+        removeColorMask(splitLeftHintMask);
+        removeColorMask(splitRightHintMask);
+        removeColorMask(maximizeHintMask);
+        splitLeftHintMask = splitRightHintMask = maximizeHintMask = -1;
+    }
+
+
+    this->sceneTree->setPosition(0, 0);
+
+    wlr_xdg_toplevel_set_maximized(wlrXdgToplevel, true);
+    wlr_xdg_toplevel_set_size(wlrXdgToplevel, targetWidth, targetHeight); 
+}
+
+
+bool View::maximizeIfEager() {
+    if (maximizeHintMask == -1) {
+        return false;
+    }
+
+    maximize();
+    return true;
+}
+
+
+void View::splitScreen(bool splitLeft) {
+    if (splitLeftHintMask != -1 || splitRightHintMask != -1 || maximizeHintMask != -1) {
+        removeColorMask(splitLeftHintMask);
+        removeColorMask(splitRightHintMask);
+        removeColorMask(maximizeHintMask);
+        splitLeftHintMask = splitRightHintMask = maximizeHintMask = -1;
+    }
+
+    inSplitScreenMode = true;
+    this->sizeBeforeMaximization = {
+        .width = this->wlrXdgToplevel->base->current.geometry.width,
+        .height = this->wlrXdgToplevel->base->current.geometry.height,
+        .x = this->sceneTree->offset.x,
+        .y = this->sceneTree->offset.y
+    };
+
+
+    this->sceneTree->setPosition(
+        splitLeft ? 0 : server->currentOutput->wlrOutput->width / 2, 
+        0
+    );
+    
+    wlr_xdg_toplevel_set_size(
+        wlrXdgToplevel, 
+        server->currentOutput->wlrOutput->width / 2, 
+        server->currentOutput->wlrOutput->height
+    ); 
+}
+
+
+bool View::splitScreenIfEager() {
+    if (splitLeftHintMask != -1) {
+        splitScreen(true);
+        return true;
+    } else if (splitRightHintMask != -1) {
+        splitScreen(false);
+        return true;
+    } else
+        return false;
+}
+
+
+bool View::tryMaximizeHint(int cursorPosX, int cursorPosY) {
+    if (this->wlrXdgToplevel->current.maximized) {
+        return true;
+    }
+
+    const int maximizeThrehold = 12;
+
+    if (cursorPosY < maximizeThrehold) {
+
+        if (maximizeHintMask != -1) {
+            return true;
+        }
+
+        maximizeHintMask = addColorMask(
+            0, 0, 
+            server->currentOutput->wlrOutput->width, 
+            server->currentOutput->wlrOutput->height,
+            0x134857,
+            0.5f,
+            true
+        );
+
+        if (splitLeftHintMask != -1 || splitRightHintMask != -1) {
+            removeColorMask(splitLeftHintMask);
+            removeColorMask(splitRightHintMask);
+            splitLeftHintMask = splitRightHintMask = -1;
+        }
+
+        return true;
+    } else if (cursorPosY > maximizeThrehold && maximizeHintMask != -1) {
+        removeColorMask(maximizeHintMask);
+        maximizeHintMask = -1;
+        return true;
+    }
+
+
+    return false;
+}
+
+
+bool View::trySplitHorizontallyHint(int cursorPosX, int cursorPosY) {
+    if (inSplitScreenMode) {
+        return true;
+    }
+
+    const int threhold = 12;
+    const int displayWidth = server->currentOutput->wlrOutput->width;
+    const auto halfWidth = server->currentOutput->wlrOutput->width / 2;
+
+    if (cursorPosX < threhold) {
+        if (splitLeftHintMask != -1)
+            return true;
+
+        splitLeftHintMask = addColorMask(
+            0, 0, 
+            halfWidth, 
+            server->currentOutput->wlrOutput->height,
+            0x134857,
+            0.5f,
+            true
+        );
+        
+        return true;
+    }
+    else if (cursorPosX + threhold >= displayWidth) {
+        if (splitRightHintMask != -1)
+            return true;
+
+        splitRightHintMask = addColorMask(
+            halfWidth, 0, halfWidth, 
+            server->currentOutput->wlrOutput->height,
+            0x134857, // color
+            0.5f,
+            true
+        );
+
+        return true;
+    }
+    else if (splitLeftHintMask != -1 || splitRightHintMask != -1) {
+        removeColorMask(splitLeftHintMask);
+        removeColorMask(splitRightHintMask);
+        splitLeftHintMask = splitRightHintMask = -1;
+    }
+
+
+
+    return false;
+}
+
+
+int View::addColorMask(
+    int x, 
+    int y, 
+    int width, 
+    int height, 
+    int32_t color, 
+    float opacity,
+    bool absoluteToOutput
+) {
+
+    const float floatColors[] = {
+        ((color & 0xFF0000) >> 16) / 255.0f, 
+        ((color & 0x00FF00) >> 8) / 255.0f, 
+        (color & 0x0000FF) / 255.0f,
+        opacity
+    };
+
+    return addColorMask(x, y, width, height, floatColors, absoluteToOutput);
+}
+
+
+int View::addColorMask(
+    int x, 
+    int y, 
+    int width, 
+    int height, 
+    const float color[4], 
+    bool absoluteToOutput
+) {
+    auto rect = scene::SceneRectNode::create(
+        absoluteToOutput ? this->server->scene->tree : this->sceneTree, 
+        width, height, color
+    );
+    if (!rect) {
+        return -1;
+    }
+
+    rect->inputTransparent = true;
+    auto id = this->colorMaskNextId++;
+    this->colorMasks[id] = rect;
+
+    rect->setPosition(x, y);
+
+    return id;
+}
+
+
+bool View::removeColorMask(int id) {
+    if (this->colorMasks.contains(id)) {
+        delete this->colorMasks[id];
+        this->colorMasks.erase(id);
+        return true;
+    } else {
+        return false;
+    }
+}
+
 
 }
 

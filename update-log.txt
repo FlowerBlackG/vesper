@@ -1,3 +1,18 @@
+version  tag  : 1.0.0
+version  code : 5
+complete time : 2024-05-05T16:19+08:00
+update   log  :
+
+dev:
+* Use Ninja instead Makefiles as CMake's backend.
+
+vesper desktop:
++ maximize when dragged a window to the top of the display.
++ split when dragged a window to the left or right edge of the display.
++ notify child-processes to exit gracefully before compositor quit.
+
+--------------------------------
+
 version  tag  : 0.0.4-dev
 version  code : 4
 complete time : 2024-04-27T15:12+08:00
