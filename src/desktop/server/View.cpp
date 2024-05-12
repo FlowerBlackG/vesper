@@ -60,15 +60,6 @@ static void xdgToplevelCommitEventBridge(wl_listener* listener, void* data) {
 
 static void xdgToplevelDestroyEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.destroy);
-
-    wl_list_remove(&view->eventListeners.map.link);
-    wl_list_remove(&view->eventListeners.unmap.link);
-    wl_list_remove(&view->eventListeners.destroy.link);
-    wl_list_remove(&view->eventListeners.requestMove.link);
-    wl_list_remove(&view->eventListeners.requestResize.link);
-    wl_list_remove(&view->eventListeners.requestMaximize.link);
-    wl_list_remove(&view->eventListeners.requestFullscreen.link);
-
     delete view;
 }
 
@@ -192,7 +183,14 @@ int View::init(const CreateOptions& options) {
 
 
 View::~View() {
-
+    wl_list_remove(&this->eventListeners.map.link);
+    wl_list_remove(&this->eventListeners.unmap.link);
+    wl_list_remove(&this->eventListeners.destroy.link);
+    wl_list_remove(&this->eventListeners.commit.link);
+    wl_list_remove(&this->eventListeners.requestMove.link);
+    wl_list_remove(&this->eventListeners.requestResize.link);
+    wl_list_remove(&this->eventListeners.requestMaximize.link);
+    wl_list_remove(&this->eventListeners.requestFullscreen.link);
 }
 
 

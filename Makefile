@@ -115,9 +115,20 @@ run-headless: debug
 		--ctrl-domain-socket vesper.sock
 
 
-.PHONY: install
-install: release
+
+.PHONY: install-debug
+install-debug: debug
 	cp target/vesper /usr/sbin/vesper
+
+
+
+.PHONY: install-release
+install-release: release
+	cp target/vesper /usr/sbin/vesper
+
+
+.PHONY: install
+install: install-release
 
 
 .PHONY: uninstall
