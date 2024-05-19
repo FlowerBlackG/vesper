@@ -80,9 +80,9 @@ CMD1,CMD2,CMD3,...
 
 启用 vnc 功能。
 
-### --vnc-auth-passwd [value]
+### VESPER_VNC_AUTH_PASSWD=[value] (environment)
 
-vnc 登录密码。不设置此参数时，无密码。
+vnc 登录密码。不设置此参数时，无密码。通过环境变量传入。
 
 ### --vnc-port [value]
 
