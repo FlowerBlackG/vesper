@@ -130,9 +130,7 @@ public:
     int run();
     void terminate();
 
-    std::map<void*, wlr_buffer*> framebufferRentMap;
     void* getFramebuffer(int displayIndex, vesper::bindings::pixman::Region32& damage);
-    void recycleFramebuffer(void* oldFrameData, int displayIndex);
 
     /* ------ 运行过程中发送控制信息 ------ */
 

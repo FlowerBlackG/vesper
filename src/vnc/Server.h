@@ -37,7 +37,6 @@ public:
             int width;
             int height;
             std::function<void* (vesper::bindings::pixman::Region32& damage)> getBuffer;
-            std::function<void (void*)> recycleBuffer;
         } screenBuffer;
 
         struct {

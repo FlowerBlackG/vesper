@@ -58,7 +58,7 @@ int Server::run() {
 
     this->framebufferFallback = new (nothrow) char [framebufSize];
     if (this->framebufferFallback == nullptr) {
-        const char* err = "failed to allocate framebuffer fallback!";
+        const char* err = "Vesper VNC: failed to allocate framebuffer fallback!";
         LOG_ERROR(err);
         opts.result.msg = err;
         opts.result.code = -1;
@@ -120,12 +120,6 @@ int Server::run() {
     this->systemRunning = true;
 
     while (systemRunning) {
-        bool usingFramebufFallback = rfbServer->frameBuffer == framebufferFallback;
-
-        if (!usingFramebufFallback && rfbServer->frameBuffer && options.screenBuffer.recycleBuffer) {
-            options.screenBuffer.recycleBuffer(rfbServer->frameBuffer);
-        }
-
         if (options.screenBuffer.getBuffer) {
             rfbServer->frameBuffer = (char*) options.screenBuffer.getBuffer(this->frameDamage);
         } else {

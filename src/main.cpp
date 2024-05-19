@@ -332,8 +332,7 @@ static int buildDesktopOptions() {
 
     }
 
-    options.renderer.pixman = options.backend.headless 
-        || args.flags.contains("--use-pixman-renderer");
+    options.renderer.pixman = args.flags.contains("--use-pixman-renderer");
 
 
     // exec cmds
@@ -397,9 +396,6 @@ static int buildVncOptions() {
         return servers.desktop.getFramebuffer(0, damage);
     };
 
-    options.screenBuffer.recycleBuffer = [] (void* buf) {
-        servers.desktop.recycleFramebuffer(buf, 0);
-    };
 
     servers.vnc.options.eventHandlers.mouse.motion = [] (
         bool absolute, double absoluteX, double absoluteY,
