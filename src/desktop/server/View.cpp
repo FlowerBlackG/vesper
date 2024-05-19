@@ -58,10 +58,18 @@ static void xdgToplevelCommitEventBridge(wl_listener* listener, void* data) {
     }
 }
 
-static void xdgToplevelDestroyEventBridge(wl_listener* listener, void* data) {
-    View* view = wl_container_of(listener, view, eventListeners.destroy);
+
+static void xdgToplevelSurfaceDestroyEventBridge(wl_listener* listener, void* data) {
+    View* view = wl_container_of(listener, view, eventListeners.surfaceDestroy);
     delete view;
 }
+
+
+static void xdgToplevelToplevelDestroyEventBridge(wl_listener* listener, void* data) {
+    View* view = wl_container_of(listener, view, eventListeners.toplevelDestroy);
+    delete view;
+}
+
 
 static void xdgToplevelRequestMoveEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.requestMove);
@@ -160,11 +168,14 @@ int View::init(const CreateOptions& options) {
     eventListeners.commit.notify = xdgToplevelCommitEventBridge;
     wl_signal_add(&wlrXdgSurface->surface->events.commit, &eventListeners.commit);
 
-    eventListeners.destroy.notify = xdgToplevelDestroyEventBridge;
-    wl_signal_add(&wlrXdgSurface->surface->events.destroy, &eventListeners.destroy);
+    eventListeners.surfaceDestroy.notify = xdgToplevelSurfaceDestroyEventBridge;
+    wl_signal_add(&wlrXdgSurface->surface->events.destroy, &eventListeners.surfaceDestroy);
 
 
     auto* topLevel = wlrXdgSurface->toplevel;
+
+    eventListeners.toplevelDestroy.notify = xdgToplevelToplevelDestroyEventBridge;
+    wl_signal_add(&topLevel->events.destroy, &eventListeners.toplevelDestroy);
 
     eventListeners.requestMove.notify = xdgToplevelRequestMoveEventBridge;
     wl_signal_add(&topLevel->events.request_move, &eventListeners.requestMove);
@@ -185,7 +196,8 @@ int View::init(const CreateOptions& options) {
 View::~View() {
     wl_list_remove(&this->eventListeners.map.link);
     wl_list_remove(&this->eventListeners.unmap.link);
-    wl_list_remove(&this->eventListeners.destroy.link);
+    wl_list_remove(&this->eventListeners.surfaceDestroy.link);
+    wl_list_remove(&this->eventListeners.toplevelDestroy.link);
     wl_list_remove(&this->eventListeners.commit.link);
     wl_list_remove(&this->eventListeners.requestMove.link);
     wl_list_remove(&this->eventListeners.requestResize.link);
