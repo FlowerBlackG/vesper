@@ -14,12 +14,14 @@
 
 #include <vector>
 #include <semaphore>
+#include <mutex>
 
 namespace vesper::desktop::scene {
 
 class Scene;
 class SceneNode;
 class RenderTimer;
+class FramebufferPlate;
 
 
 class Output {
@@ -108,40 +110,7 @@ public:
 
     std::vector<RenderListEntry> renderList;
 
-
-    struct FramebufferPlate {
-    protected:
-        struct {
-            wlr_buffer* buf = nullptr;
-            vesper::bindings::pixman::Region32 damage;
-        } buf;
-
-        struct {
-            std::vector<wlr_buffer*> bin;
-        } recycleBin;
-
-        std::binary_semaphore lock {1};
-
-    public:
-        ~FramebufferPlate();
-        void recycle(wlr_buffer*);
-        wlr_buffer* get(vesper::bindings::pixman::Region32& damage);
-
-        /**
-         * 
-         * @param dontLockBuffer if you already locked the buf for plate, 
-         *                       tell plate don't lock it again.
-         */
-        void put(
-            wlr_buffer*, 
-            const vesper::bindings::pixman::Region32& damage,
-            bool dontLockBuffer = false
-        );
-
-        void clear();
-
-    } framebufferPlate;
-
+    FramebufferPlate* framebufferPlate = nullptr;
 
 }; // class Output
 
@@ -152,7 +121,6 @@ extern wlr_addon_interface sceneOutputAddonImpl;
 struct OutputSampleEvent {
     Output* output;    
 };
-
 
 
 } // namespace vesper::desktop::scene

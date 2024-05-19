@@ -11,6 +11,8 @@
 #include "../../utils/wlroots-cpp.h"
 #include "../../bindings/pixman.h"
 
+namespace vesper::desktop::server { class Server; }
+
 namespace vesper::desktop::scene {
 
 class SceneTreeNode;
@@ -21,19 +23,19 @@ class OutputLayout;
 class Scene {
 
 public:
-    /**
-     * Create a Scene object.
-     * This will alloc the object as well as init it by calling init().
-     * 
-     * @return nullptr if failed. 
-     */
-    static Scene* create();
+    
+    struct CreateOptions {
+        vesper::desktop::server::Server* desktopServer;
+    };
+
+    static Scene* create(const CreateOptions&);
+
 
     ~Scene();
     
 
 public:
-    int init();
+    int init(const CreateOptions&);
 
     OutputLayout* attachWlrOutputLayout(wlr_output_layout* wlrOutputLayout);
 
@@ -73,6 +75,10 @@ public:
     struct {
         wl_listener linuxDmaBufV1Destroy;
     } eventListeners;
+
+
+
+    vesper::desktop::server::Server* desktopServer;
 
 };
 

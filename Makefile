@@ -74,12 +74,10 @@ run-no-args: debug
 
 .PHONY: run
 run: debug
-	cd target && ./vesper \
+	cd target && VESPER_VNC_AUTH_PASSWD=123456 ./vesper \
 		--add-virtual-display 720*720 \
-		--use-pixman-renderer \
 		--exec-cmds "konsole, dolphin" \
 		--enable-vnc \
-		--vnc-auth-passwd 123456 \
 		--vnc-port 5900 \
 		--libvncserver-passwd-file vesper-vnc-passwd \
 		--enable-ctrl \
@@ -88,12 +86,11 @@ run: debug
 
 .PHONY: run-release
 run-release: release
-	cd target && ./vesper \
+	cd target && VESPER_VNC_AUTH_PASSWD=123456 ./vesper \
 		--add-virtual-display 720*720 \
 		--use-pixman-renderer \
 		--exec-cmds "konsole, dolphin" \
 		--enable-vnc \
-		--vnc-auth-passwd 123456 \
 		--vnc-port 5900 \
 		--libvncserver-passwd-file vesper-vnc-passwd \
 		--enable-ctrl \
@@ -102,13 +99,12 @@ run-release: release
 
 .PHONY: run-headless
 run-headless: debug
-	cd target && ./vesper \
+	cd target && VESPER_VNC_AUTH_PASSWD=123456 ./vesper \
 		--headless \
 		--add-virtual-display 1440*900 \
 		--use-pixman-renderer \
 		--exec-cmds "konsole, dolphin" \
 		--enable-vnc \
-		--vnc-auth-passwd 123456 \
 		--vnc-port 5900 \
 		--libvncserver-passwd-file vesper-vnc-passwd \
 		--enable-ctrl \

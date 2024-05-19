@@ -12,17 +12,20 @@
             "args": [
                 "--headless",
                 "--add-virtual-display", "720*720",
-                "--use-pixman-renderer",
                 "--exec-cmds", "konsole, dolphin",
                 "--enable-vnc",
-                "--vnc-auth-passwd", "123456",
                 "--vnc-port", "5900",
                 "--libvncserver-passwd-file", "vesper-vnc-passwd",
                 "--enable-ctrl",
                 "--ctrl-domain-socket", "vesper.sock"
             ],
             "cwd": "${workspaceFolder}/target",
-            "environment": [],
+            "environment": [
+                {
+                    "name": "VESPER_VNC_AUTH_PASSWD",
+                    "value": "123456"
+                }
+            ],
             "MIMode": "gdb",
             "setupCommands": [
                 {
@@ -41,17 +44,20 @@
             "request": "launch",
             "program": "${workspaceFolder}/target/vesper",
             "args": [
-                "--use-pixman-renderer",
                 "--exec-cmds", "konsole, dolphin",
                 "--enable-vnc",
-                "--vnc-auth-passwd", "123456",
                 "--vnc-port", "5900",
                 "--libvncserver-passwd-file", "vesper-vnc-passwd",
                 "--enable-ctrl",
                 "--ctrl-domain-socket", "vesper.sock"
             ],
             "cwd": "${workspaceFolder}/target",
-            "environment": [],
+            "environment": [
+                {
+                    "name": "VESPER_VNC_AUTH_PASSWD",
+                    "value": "123456"
+                }
+            ],
             "MIMode": "gdb",
             "setupCommands": [
                 {

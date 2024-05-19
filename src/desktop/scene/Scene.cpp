@@ -30,22 +30,16 @@ static void linuxDmaBufV1DestroyEventBridge(wl_listener* listener, void* data) {
 }
 
 
-Scene* Scene::create() {
-    Scene* scene = new (nothrow) Scene;
+VESPER_OBJ_UTILS_IMPL_CREATE(Scene, Scene::CreateOptions)
 
-    if (scene && scene->init()) {
-        delete scene;
-        return nullptr;
-    }
-
-    return scene;
-}
 
 Scene::~Scene() {
     this->destroyTree();
 }
 
-int Scene::init() {
+int Scene::init(const CreateOptions& options) {
+
+    this->desktopServer = options.desktopServer;
 
     tree = SceneTreeNode::create(nullptr);
     if (!tree) {

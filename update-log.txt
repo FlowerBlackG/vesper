@@ -1,10 +1,13 @@
 version  tag  : next-1.1 (dev)
-version  code : 7
+version  code : ?
 complete time : ?
 update   log  :
 
 Vesper VNC:
 * Drop cmdline --vnc-auth-passwd. Use environment variable VESPER_VNC_AUTH_PASSWD instead.
+
+Vesper Desktop:
++ Support other renderers like gles2 when VNC enabled.  ** todo: buggy. fix damage detection **
 
 --------------------------------
 

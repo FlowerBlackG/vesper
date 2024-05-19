@@ -19,6 +19,7 @@
 #include "./Popup.h"
 #include "../scene/Scene.h"
 #include "../scene/Output.h"
+#include "../scene/FramebufferPlate.h"
 #include "../scene/SceneNode.h"
 #include "../scene/XdgShell.h"
 #include "../scene/Surface.h"
@@ -220,6 +221,16 @@ int Server::run() {
         return -1;
     }
 
+
+    if (wlr_renderer_is_pixman(wlrRenderer)) {
+        LOG_INFO("Vesper Desktop: renderer is pixman.")
+    } else if (wlr_renderer_is_gles2(wlrRenderer)) {
+        LOG_INFO("Vesper Desktop: renderer is gles2.")
+    } else if (wlr_renderer_is_vk(wlrRenderer)) {
+        LOG_INFO("Vesper Desktop: renderer is vulkan.")
+    }
+
+
     wlr_renderer_init_wl_display(wlrRenderer, wlDisplay);
 
     wlrAllocator = wlr_allocator_autocreate(wlrBackend, wlrRenderer);
@@ -242,7 +253,10 @@ int Server::run() {
 
     // scene
 
-    scene = vesper::desktop::scene::Scene::create();
+    scene = vesper::desktop::scene::Scene::create({
+        .desktopServer = this
+    });
+    
     if (!scene) {
         LOG_ERROR("failed to alloc scene!");
         options.result.code = -1;
@@ -484,10 +498,6 @@ void* Server::getFramebuffer(int displayIndex, pixman::Region32& damage) {
         return nullptr;
     }
 
-    if (!wlr_renderer_is_pixman(wlrRenderer)) {
-        return nullptr;  // only support pixman's framebuffer.
-    }
-
     int currIdx = -1;
     Output* serverOutput;
     wl_list_for_each(serverOutput, &this->outputs, link) {
@@ -501,59 +511,12 @@ void* Server::getFramebuffer(int displayIndex, pixman::Region32& damage) {
         return nullptr;
     }
 
-    auto& plate = serverOutput->sceneOutput->framebufferPlate;
+    auto plate = serverOutput->sceneOutput->framebufferPlate;
 
-    wlr_buffer* wlrBuf = plate.get(damage);
-    if (!wlrBuf) {
-        return nullptr;
-    }
-
-    pixman_image_t* img = wlr_pixman_renderer_get_buffer_image(
-        serverOutput->wlrOutput->renderer, wlrBuf
-    );
-
-    if (!img) {
-        plate.recycle(wlrBuf);
-        return nullptr;
-    }
-
-    auto imgFormat = pixman_image_get_format(img);
-    if (imgFormat != PIXMAN_a8r8g8b8 && imgFormat != PIXMAN_x8r8g8b8) {
-        LOG_WARN("bad format: ", int64_t(imgFormat));
-        plate.recycle(wlrBuf);
-        return nullptr;
-    }
-
-    auto* data = pixman_image_get_data(img);
-    framebufferRentMap[(void*) data] = wlrBuf;
-    return data;
+    return plate->get(damage);
 }
 
-void Server::recycleFramebuffer(void* oldFrameData, int displayIndex) {
-    if (!framebufferRentMap.contains(oldFrameData)) {
-        LOG_WARN("frame data unrecognized!");
-        return;
-    }
 
-    wlr_buffer* oldBuf = framebufferRentMap[oldFrameData];
-    framebufferRentMap.erase(oldFrameData);
-
-    int currIdx = -1;
-    Output* serverOutput;
-    wl_list_for_each(serverOutput, &this->outputs, link) {
-        currIdx++;
-        if (currIdx == displayIndex) {
-            break;
-        }
-    }
-
-    if (currIdx != displayIndex) {
-        LOG_WARN("there's no display with index ", displayIndex);
-        return;
-    }
-
-    serverOutput->sceneOutput->framebufferPlate.recycle(oldBuf);
-}
 
 void Server::newOutputEventHandler(wlr_output* newOutput) {
     wlr_output_init_render(newOutput, wlrAllocator, wlrRenderer);
