@@ -1,3 +1,14 @@
+version  tag  : 1.0.2
+version  code : 7
+complete time : 2024-05-19T16:21+08:00
+update   log  :
+
+Vesper VNC:
+* Drop cmdline --vnc-auth-passwd. Use environment variable VESPER_VNC_AUTH_PASSWD instead.
+
+--------------------------------
+
+
 version  tag  : 1.0.1
 version  code : 6
 complete time : 2024-05-12T15:36+08:00

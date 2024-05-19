@@ -109,7 +109,6 @@ static void loadPredefinedArgKeys() {
         { "--exec-cmds" },
         
         { "--enable-vnc", true },
-        { "--vnc-auth-passwd" },
         { "--vnc-port" },
         { "--libvncserver-passwd-file" },
 
@@ -378,14 +377,17 @@ static int buildVncOptions() {
         }
     }
 
-    if (args.values.contains("--vnc-auth-passwd")) {
+
+    const char* vncPwEnvKey = "VESPER_VNC_AUTH_PASSWD";
+    bool envHasVNCPw = args.env.contains(vncPwEnvKey);
+    if (envHasVNCPw) {
         const char* libvncserverPasswdFile = "--libvncserver-passwd-file";
         if (!args.values.contains(libvncserverPasswdFile)) {
-            LOG_ERROR("--vnc-auth-passwd should be paired with ", libvncserverPasswdFile);
+            LOG_ERROR(vncPwEnvKey, " should be paired with cmdline ", libvncserverPasswdFile);
             return 1;
         }
 
-        options.auth.password = args.values["--vnc-auth-passwd"];
+        options.auth.password = args.env[vncPwEnvKey];
         options.auth.libvncserverPasswdFile = args.env["XDG_RUNTIME_DIR"];
         options.auth.libvncserverPasswdFile += '/';
         options.auth.libvncserverPasswdFile += args.values[libvncserverPasswdFile];
