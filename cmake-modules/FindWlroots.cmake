@@ -9,9 +9,9 @@
 #
 
 find_package(PkgConfig)
-pkg_check_modules(PC_WLR QUIET wlroots)
+pkg_check_modules(PC_WLR QUIET wlroots-0.18)
 find_path(WLR_INCLUDE_DIRS NAMES wlr/config.h HINTS ${PC_WLR_INCLUDE_DIRS})
-find_library(WLR_LIBRARIES NAMES wlroots HINTS ${PC_WLR_LIBRARY_DIRS})
+find_library(WLR_LIBRARIES NAMES wlroots-0.18 HINTS ${PC_WLR_LIBRARY_DIRS})
 
 set(WLR_DEFINITIONS ${PC_WLR_CFLAGS_OTHER})
 
