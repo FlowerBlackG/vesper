@@ -1,3 +1,14 @@
+version  tag  : 1.0.4
+version  code : 9
+complete time : 2024-09-03T17:32+08:00
+update   log  :
+
+More logs.
+Remove surface destroy event listener in View.
+
+
+--------------------------------
+
 version  tag  : 1.0.3
 version  code : 8
 complete time : 2024-05-19T17:10+08:00

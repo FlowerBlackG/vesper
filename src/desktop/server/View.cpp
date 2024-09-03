@@ -18,6 +18,13 @@ using namespace vesper::desktop;
 
 namespace vesper::desktop::server {
 
+
+static const char* appTitleOf(View* view, const char* defaultTitle = "<no title>") {
+    auto title = view->wlrXdgToplevel->title;
+    return title ? title : defaultTitle;
+}
+
+
 /**
  * called when the surface is mapped, or ready to display on-screen. 
  */
@@ -26,8 +33,7 @@ static void xdgToplevelMapEventBridge(wl_listener* listener, void* data) {
    
     wl_list_insert(&view->server->views, &view->link);
 
-    auto appTitle = view->wlrXdgToplevel->title;
-    LOG_INFO("new xdg toplevel \"", (appTitle ? appTitle : "no title"), "\" mapped.");
+    LOG_INFO("new xdg toplevel \"", appTitleOf(view), "\" mapped.");
 
     view->focus(view->wlrXdgToplevel->base->surface);
 }
@@ -40,12 +46,10 @@ static void xdgToplevelUnmapEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.unmap);
    
     if (view == view->server->cursor->grabbedView) {
-        view->server->cursor->grabbedView = nullptr;
-
-        view->server->cursor->cursorMode = Cursor::Mode::PASSTHROUGH;
-        view->server->cursor->grabbedView = nullptr;
-
+        view->server->cursor->resetCursorMode();
     }
+
+    LOG_INFO("xdg toplevel \"", appTitleOf(view), "\" unmapped.");
 
     wl_list_remove(&view->link);
 }
@@ -54,19 +58,15 @@ static void xdgToplevelCommitEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.commit);
 
     if (view->wlrXdgToplevel->base->initial_commit) {
+        LOG_INFO("xdg toplevel \"", appTitleOf(view), "\" initial commit.");
         wlr_xdg_toplevel_set_size(view->wlrXdgToplevel, 0, 0);
     }
 }
 
 
-static void xdgToplevelSurfaceDestroyEventBridge(wl_listener* listener, void* data) {
-    View* view = wl_container_of(listener, view, eventListeners.surfaceDestroy);
-    delete view;
-}
-
-
 static void xdgToplevelToplevelDestroyEventBridge(wl_listener* listener, void* data) {
     View* view = wl_container_of(listener, view, eventListeners.toplevelDestroy);
+    LOG_INFO("xdg toplevel \"", appTitleOf(view), "\" destroy.");
     delete view;
 }
 
@@ -141,6 +141,7 @@ int View::init(const CreateOptions& options) {
     this->server = options.server;
     this->wlrXdgToplevel = options.xdgToplevel;
 
+    LOG_INFO("new View: ", appTitleOf(this));
 
     auto* xdgSurface = scene::XdgSurface::create({
         .parent = server->scene->tree,
@@ -168,9 +169,6 @@ int View::init(const CreateOptions& options) {
     eventListeners.commit.notify = xdgToplevelCommitEventBridge;
     wl_signal_add(&wlrXdgSurface->surface->events.commit, &eventListeners.commit);
 
-    eventListeners.surfaceDestroy.notify = xdgToplevelSurfaceDestroyEventBridge;
-    wl_signal_add(&wlrXdgSurface->surface->events.destroy, &eventListeners.surfaceDestroy);
-
 
     auto* topLevel = wlrXdgSurface->toplevel;
 
@@ -196,7 +194,6 @@ int View::init(const CreateOptions& options) {
 View::~View() {
     wl_list_remove(&this->eventListeners.map.link);
     wl_list_remove(&this->eventListeners.unmap.link);
-    wl_list_remove(&this->eventListeners.surfaceDestroy.link);
     wl_list_remove(&this->eventListeners.toplevelDestroy.link);
     wl_list_remove(&this->eventListeners.commit.link);
     wl_list_remove(&this->eventListeners.requestMove.link);

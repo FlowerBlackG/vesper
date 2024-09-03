@@ -222,6 +222,13 @@ void Cursor::processResize(uint32_t timeMsec) {
     );
 }
 
+
+void Cursor::resetCursorMode() {
+    this->cursorMode = Mode::PASSTHROUGH;
+    this->grabbedView = nullptr;
+}
+
+
 void Cursor::buttonEventHandler(
     uint32_t timeMsec, uint32_t button, wl_pointer_button_state state
 ) {
@@ -239,8 +246,7 @@ void Cursor::buttonEventHandler(
             grabbedView->maximizeIfEager() || grabbedView->splitScreenIfEager();
         }
 
-        this->cursorMode = Cursor::Mode::PASSTHROUGH;
-        this->grabbedView = nullptr;
+        this->resetCursorMode();
     } else if (state == WL_POINTER_BUTTON_STATE_PRESSED) {
         if (view) {
             view->focus(surface);

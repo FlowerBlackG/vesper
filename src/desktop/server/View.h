@@ -125,7 +125,6 @@ public:
         wl_listener unmap;
         
         wl_listener toplevelDestroy;
-        wl_listener surfaceDestroy;
 
         wl_listener commit;
         wl_listener requestMove;
