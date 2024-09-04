@@ -11,10 +11,10 @@ cmake_minimum_required(VERSION 3.29.2)
 ]]
 set(VESPER_VERSION_MAJOR 1)
 set(VESPER_VERSION_MINOR 0)
-set(VESPER_VERSION_PATCH 4)
+set(VESPER_VERSION_PATCH 5)
 set(VESPER_VERSION_TAIL "") # 例："-dev"
 
-set(VESPER_VERSION_CODE 9)
+set(VESPER_VERSION_CODE 10)
 
 string(TIMESTAMP build_time_iso8601 UTC)  # example: 2024-04-19T13:39Z
 string(TIMESTAMP build_time_human_readable "%B %d, %Y %H:%M:%S %Z")

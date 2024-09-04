@@ -536,7 +536,6 @@ static int daemonize() {
     // 更改当前工作目录。
     chdir("~");
 
-    umask(0);
     signal(SIGTERM, [] (int arg) {
         servers.desktop.terminateAsync();
         servers.vnc.terminate();

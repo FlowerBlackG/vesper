@@ -1,3 +1,14 @@
+version  tag  : 1.0.5
+version  code : 10
+complete time : 2024-09-04T13:32+08:00
+update   log  :
+
+Security:
+  Fix horizontal privilege escalation vulnerabilities in daemon mode.
+
+
+--------------------------------
+
 version  tag  : 1.0.4
 version  code : 9
 complete time : 2024-09-03T17:32+08:00
