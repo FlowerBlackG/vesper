@@ -371,6 +371,12 @@ void Server::terminate() {
     }
 
     terminated = true;
+
+    if (this->runtimeControlTimer) {
+        wl_event_source_remove(this->runtimeControlTimer);
+        this->runtimeControlTimer = nullptr;
+    }
+
     wl_event_loop_add_idle(
         wl_display_get_event_loop(wlDisplay),
         [] (void* data) { wl_display_terminate( (wl_display*) data ); },
@@ -444,7 +450,13 @@ void Server::runtimeControlEventLoop() {
         return;
     }
 
+    
     // do things
+
+    if (this->runtimeControlTimer) {
+        wl_event_source_remove(this->runtimeControlTimer);
+    }
+
 
     if (this->wlDisplayRunning) {
         runtimeControlCmds.lock.acquire();
@@ -465,7 +477,7 @@ void Server::runtimeControlEventLoop() {
     // register next loop
 
     if (!this->terminated) {
-        wl_event_source* event = wl_event_loop_add_timer(
+        this->runtimeControlTimer = wl_event_loop_add_timer(
             this->wlEventLoop,
             [] (void* data) { 
                 ((Server*) data)->runtimeControlEventLoop();
@@ -474,7 +486,8 @@ void Server::runtimeControlEventLoop() {
             this
         );
 
-        wl_event_source_timer_update(event, options.runtimeCtrl.checkIntervalMs);
+        wl_event_source_timer_update(runtimeControlTimer, options.runtimeCtrl.checkIntervalMs);
+        
     }
 }
 

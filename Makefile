@@ -74,7 +74,9 @@ run-no-args: debug
 
 .PHONY: run
 run: debug
-	cd target && VESPER_VNC_AUTH_PASSWD=123456 ./vesper \
+	cd target && \
+	VESPER_VNC_AUTH_PASSWD=123456 \
+	./vesper \
 		--add-virtual-display 720*720 \
 		--use-pixman-renderer \
 		--exec-cmds "konsole, dolphin" \

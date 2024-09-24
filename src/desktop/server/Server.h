@@ -273,6 +273,9 @@ public:
     wl_list keyboards;
     wlr_seat* wlrSeat = nullptr;
 
+
+    wl_event_source* runtimeControlTimer = nullptr;
+
 public:
     struct {
         wl_listener newOutput;

@@ -1,3 +1,14 @@
+version  tag  : 1.0.6
+version  code : 11
+complete time : 2024-09-24T19:35+08:00
+update   log  :
+
+Fix a memory leak issue around the timer of runtime control event loop in vepser wayland server.
+
+
+--------------------------------
+
+
 version  tag  : 1.0.5
 version  code : 10
 complete time : 2024-09-04T13:32+08:00
