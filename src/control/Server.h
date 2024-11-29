@@ -11,6 +11,7 @@
 #include <semaphore>
 #include <string>
 #include <functional>
+#include <vector>
 
 #include "./Protocols.h"
 
@@ -76,7 +77,7 @@ protected:
     int processGetVesperVersion(protocol::GetVesperVersion*, int connFd);
 
 protected:
-    char* socketDataBuf = nullptr;
+    std::vector<char> socketDataBuf { protocol::HEADER_LEN };
     int socketListenFd = -1;
 
     bool systemRunning;

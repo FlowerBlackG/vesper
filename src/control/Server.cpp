@@ -41,20 +41,6 @@ static void clearRunOptionsResult(Server::RunOptions& options) {
 int Server::run() {
     clearRunOptionsResult(this->options);
 
-    // allocate socket data buffer
-
-    if (this->socketDataBuf == nullptr) {
-        this->socketDataBuf = new (nothrow) char[SOCKET_DATA_BUF_SIZE];
-    }
-
-    if (this->socketDataBuf == nullptr) {
-        const char* errMsg = "failed to alloc socket data buffer";
-        LOG_ERROR(errMsg);
-        options.result.msg = errMsg;
-        options.result.code = -1;
-        return options.result.code;
-    }
-
     // init domain socket
 
     int listenFd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -114,10 +100,6 @@ int Server::run() {
 }
 
 void Server::clear() {
-    if (this->socketDataBuf) {
-        delete[] this->socketDataBuf;
-        this->socketDataBuf = nullptr;
-    }
 
     if (this->socketListenFd != -1) {
         close(this->socketListenFd);
@@ -195,14 +177,14 @@ int Server::acceptClient() {
         return 1;
     }
 
-    char* dataPtr = this->socketDataBuf;
     int resCode = 0;
 
     do {
         // 读入 header
 
-        const int HEADER_LEN = 16;
-        if (readNBytesFromSocket(connFd, HEADER_LEN, dataPtr)) {
+        auto dataPtr = socketDataBuf.data();
+
+        if (readNBytesFromSocket(connFd, protocol::HEADER_LEN, dataPtr)) {
             const char* err = "failed to read header!";
             LOG_ERROR(err);
             sendResponse(connFd, 2, err);
@@ -225,7 +207,12 @@ int Server::acceptClient() {
         uint64_t length = be64toh(*(uint64_t*) dataPtr);
         dataPtr += 8;
 
-        if (readNBytesFromSocket(connFd, length, dataPtr)) {
+        if (length + protocol::HEADER_LEN > socketDataBuf.capacity())
+            socketDataBuf.reserve(length + protocol::HEADER_LEN);
+
+        dataPtr = socketDataBuf.data();
+
+        if (readNBytesFromSocket(connFd, length, dataPtr + protocol::HEADER_LEN)) {
             const char* err = "failed to read body!";
             LOG_ERROR(err);
             sendResponse(connFd, 5, err);
@@ -233,7 +220,7 @@ int Server::acceptClient() {
             break;
         }
     
-        protocol::Base* protocol = protocol::decode(socketDataBuf, type, length + HEADER_LEN);
+        protocol::Base* protocol = protocol::decode(dataPtr, type, length + protocol::HEADER_LEN);
 
         if (protocol == nullptr) {
             const char* err = "failed to parse protocol!";

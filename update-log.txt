@@ -1,3 +1,12 @@
+version  tag  : 1.0.7
+version  code : 12
+complete time : 2024-11-29T17:12+08:00
+update   log  :
+
+Fixed a buffer overflow vulnerability in Vesper Control.
+
+--------------------------------
+
 version  tag  : 1.0.6
 version  code : 11
 complete time : 2024-09-24T19:35+08:00
